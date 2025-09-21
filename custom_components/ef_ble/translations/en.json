@@ -381,6 +381,130 @@
       },
       "grid_frequency": {
         "name": "Grid Frequency"
+      },
+      "backup_is_ready": {
+        "name": "Channel {channel} Backup Ready"
+      },
+      "backup_ctrl_status": {
+        "name": "Channel {channel} Control Status",
+        "state": {
+          "backup_ch_off": "Off",
+          "backup_ch_discharge": "Discharging",
+          "backup_ch_charge": "Charging",
+          "backup_ch_em_stop": "Emergency Stop",
+          "backup_ch_standby": "Standby"
+        }
+      },
+      "backup_force_charge": {
+        "name": "Channel {channel} Force Charge",
+        "state": {
+          "force_charge_off": "Off",
+          "force_charge_on": "On"
+        }
+      },
+      "backup_relay1_count": {
+        "name": "Channel {channel} Relay 1 Count"
+      },
+      "backup_relay2_count": {
+        "name": "Channel {channel} Relay 2 Count"
+      },
+      "backup_wakeup_charge": {
+        "name": "Channel {channel} Wakeup Charge Level"
+      },
+      "backup_connector_type": {
+        "name": "Channel {channel} Connector Type"
+      },
+      "energy_serial_number": {
+        "name": "Energy {energy} Serial Number"
+      },
+      "energy_device_type": {
+        "name": "Energy {energy} Device Type"
+      },
+      "energy_full_capacity": {
+        "name": "Energy {energy} Full Capacity"
+      },
+      "energy_rated_power": {
+        "name": "Energy {energy} Rated Power"
+      },
+      "energy_enabled": {
+        "name": "Energy {energy} Enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
+      },
+      "energy_connected": {
+        "name": "Energy {energy} Connected",
+        "state": {
+          "disconnected": "Disconnected",
+          "connected": "Connected"
+        }
+      },
+      "energy_ac_output": {
+        "name": "Energy {energy} AC Output",
+        "state": {
+          "closed": "Closed",
+          "open": "Open"
+        }
+      },
+      "energy_power_output": {
+        "name": "Energy {energy} Power Output",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "energy_grid_charging": {
+        "name": "Energy {energy} Grid Charging",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "energy_solar_charging": {
+        "name": "Energy {energy} Solar Charging",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "energy_battery_level": {
+        "name": "Energy {energy} Battery Level"
+      },
+      "energy_output_power": {
+        "name": "Energy {energy} Output Power"
+      },
+      "energy_ems_charge_flag": {
+        "name": "Energy {energy} EMS Charge Flag",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
+      },
+      "energy_hw_connected": {
+        "name": "Energy {energy} Hardware Connected",
+        "state": {
+          "disconnected": "Disconnected",
+          "connected": "Connected"
+        }
+      },
+      "energy_battery_temperature": {
+        "name": "Energy {energy} Battery Temperature"
+      },
+      "energy_lcd_input_power": {
+        "name": "Energy {energy} LCD Input Power"
+      },
+      "energy_pv_input_power": {
+        "name": "Energy {energy} PV Input Power"
+      },
+      "energy_pv_lv_input_power": {
+        "name": "Energy {energy} PV LV Input Power"
+      },
+      "energy_pv_hv_input_power": {
+        "name": "Energy {energy} PV HV Input Power"
+      },
+      "energy_error_count": {
+        "name": "Energy {energy} Error Count"
       }
     },
     "select": {

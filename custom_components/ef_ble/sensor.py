@@ -42,6 +42,241 @@ def _auto_name_from_key(key: str):
     )
 
 
+def _create_shp2_backup_channel_sensors():
+    """Create sensor descriptions for SHP2 backup channel info"""
+    sensors = {}
+
+    for i in range(1, shp2.Device.NUM_OF_CHANNELS + 1):
+        sensors.update({
+            f"ch{i}_backup_is_ready": SensorEntityDescription(
+                key=f"ch{i}_backup_is_ready",
+                device_class=SensorDeviceClass.ENUM,
+                options=["false", "true"],
+                translation_key="backup_is_ready",
+                translation_placeholders={"channel": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"ch{i}_ctrl_status": SensorEntityDescription(
+                key=f"ch{i}_ctrl_status",
+                device_class=SensorDeviceClass.ENUM,
+                options=["backup_ch_off", "backup_ch_discharge", "backup_ch_charge", "backup_ch_em_stop", "backup_ch_standby"],
+                translation_key="backup_ctrl_status",
+                translation_placeholders={"channel": f"{i}"},
+            ),
+            f"ch{i}_force_charge": SensorEntityDescription(
+                key=f"ch{i}_force_charge",
+                device_class=SensorDeviceClass.ENUM,
+                options=["force_charge_off", "force_charge_on"],
+                translation_key="backup_force_charge",
+                translation_placeholders={"channel": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"ch{i}_backup_rly1_cnt": SensorEntityDescription(
+                key=f"ch{i}_backup_rly1_cnt",
+                state_class=SensorStateClass.TOTAL,
+                translation_key="backup_relay1_count",
+                translation_placeholders={"channel": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"ch{i}_backup_rly2_cnt": SensorEntityDescription(
+                key=f"ch{i}_backup_rly2_cnt",
+                state_class=SensorStateClass.TOTAL,
+                translation_key="backup_relay2_count",
+                translation_placeholders={"channel": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"ch{i}_wake_up_charge_status": SensorEntityDescription(
+                key=f"ch{i}_wake_up_charge_status",
+                native_unit_of_measurement=PERCENTAGE,
+                device_class=SensorDeviceClass.BATTERY,
+                state_class=SensorStateClass.MEASUREMENT,
+                translation_key="backup_wakeup_charge",
+                translation_placeholders={"channel": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"ch{i}_energy_5p8_type": SensorEntityDescription(
+                key=f"ch{i}_energy_5p8_type",
+                translation_key="backup_connector_type",
+                translation_placeholders={"channel": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+        })
+
+    return sensors
+
+
+def _create_shp2_energy_sensors():
+    """Create sensor descriptions for SHP2 energy info"""
+    sensors = {}
+
+    for i in range(1, shp2.Device.NUM_OF_CHANNELS + 1):
+        sensors.update({
+            f"energy{i}_sn": SensorEntityDescription(
+                key=f"energy{i}_sn",
+                translation_key="energy_serial_number",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_type": SensorEntityDescription(
+                key=f"energy{i}_type",
+                translation_key="energy_device_type",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_capacity": SensorEntityDescription(
+                key=f"energy{i}_capacity",
+                native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
+                device_class=SensorDeviceClass.ENERGY_STORAGE,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+                translation_key="energy_full_capacity",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_rate_power": SensorEntityDescription(
+                key=f"energy{i}_rate_power",
+                native_unit_of_measurement=UnitOfPower.WATT,
+                device_class=SensorDeviceClass.POWER,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                translation_key="energy_rated_power",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_is_enabled": SensorEntityDescription(
+                key=f"energy{i}_is_enabled",
+                device_class=SensorDeviceClass.ENUM,
+                options=["disabled", "enabled"],
+                translation_key="energy_enabled",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_is_connected": SensorEntityDescription(
+                key=f"energy{i}_is_connected",
+                device_class=SensorDeviceClass.ENUM,
+                options=["disconnected", "connected"],
+                translation_key="energy_connected",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_is_ac_open": SensorEntityDescription(
+                key=f"energy{i}_is_ac_open",
+                device_class=SensorDeviceClass.ENUM,
+                options=["closed", "open"],
+                translation_key="energy_ac_output",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_is_power_output": SensorEntityDescription(
+                key=f"energy{i}_is_power_output",
+                device_class=SensorDeviceClass.ENUM,
+                options=["off", "on"],
+                translation_key="energy_power_output",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_is_grid_charge": SensorEntityDescription(
+                key=f"energy{i}_is_grid_charge",
+                device_class=SensorDeviceClass.ENUM,
+                options=["off", "on"],
+                translation_key="energy_grid_charging",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_is_mppt_charge": SensorEntityDescription(
+                key=f"energy{i}_is_mppt_charge",
+                device_class=SensorDeviceClass.ENUM,
+                options=["off", "on"],
+                translation_key="energy_solar_charging",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_battery_percentage": SensorEntityDescription(
+                key=f"energy{i}_battery_percentage",
+                native_unit_of_measurement=PERCENTAGE,
+                device_class=SensorDeviceClass.BATTERY,
+                state_class=SensorStateClass.MEASUREMENT,
+                translation_key="energy_battery_level",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_output_power": SensorEntityDescription(
+                key=f"energy{i}_output_power",
+                native_unit_of_measurement=UnitOfPower.WATT,
+                device_class=SensorDeviceClass.POWER,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=1,
+                translation_key="energy_output_power",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_ems_charging": SensorEntityDescription(
+                key=f"energy{i}_ems_charging",
+                device_class=SensorDeviceClass.ENUM,
+                options=["off", "on"],
+                translation_key="energy_ems_charge_flag",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_hw_connect": SensorEntityDescription(
+                key=f"energy{i}_hw_connect",
+                device_class=SensorDeviceClass.ENUM,
+                options=["disconnected", "connected"],
+                translation_key="energy_hw_connected",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_ems_battery_temp": SensorEntityDescription(
+                key=f"energy{i}_ems_battery_temp",
+                native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+                device_class=SensorDeviceClass.TEMPERATURE,
+                state_class=SensorStateClass.MEASUREMENT,
+                translation_key="energy_battery_temperature",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_lcd_input": SensorEntityDescription(
+                key=f"energy{i}_lcd_input",
+                native_unit_of_measurement=UnitOfPower.WATT,
+                device_class=SensorDeviceClass.POWER,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                translation_key="energy_lcd_input_power",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+            f"energy{i}_pv_input": SensorEntityDescription(
+                key=f"energy{i}_pv_input",
+                native_unit_of_measurement=UnitOfPower.WATT,
+                device_class=SensorDeviceClass.POWER,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                translation_key="energy_pv_input_power",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_pv_lv_input": SensorEntityDescription(
+                key=f"energy{i}_pv_lv_input",
+                native_unit_of_measurement=UnitOfPower.WATT,
+                device_class=SensorDeviceClass.POWER,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                translation_key="energy_pv_lv_input_power",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_pv_hv_input": SensorEntityDescription(
+                key=f"energy{i}_pv_hv_input",
+                native_unit_of_measurement=UnitOfPower.WATT,
+                device_class=SensorDeviceClass.POWER,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                translation_key="energy_pv_hv_input_power",
+                translation_placeholders={"energy": f"{i}"},
+            ),
+            f"energy{i}_error_code": SensorEntityDescription(
+                key=f"energy{i}_error_code",
+                state_class=SensorStateClass.MEASUREMENT,
+                translation_key="energy_error_count",
+                translation_placeholders={"energy": f"{i}"},
+                entity_registry_enabled_default=False,
+            ),
+        })
+
+    return sensors
+
+
 @dataclass(frozen=True, kw_only=True)
 class EcoflowSensorEntityDescription[Device: DeviceBase](SensorEntityDescription):
     state_attribute_fields: list[str] = field(default_factory=list)
@@ -125,6 +360,10 @@ SENSOR_TYPES: dict[str, SensorEntityDescription] = {
         )
         for i in range(1, shp2.Device.NUM_OF_CHANNELS + 1)
     },
+    # SHP2 Backup Channel Info - dynamically generated
+    **_create_shp2_backup_channel_sensors(),
+    # SHP2 Energy Info - dynamically generated
+    **_create_shp2_energy_sensors(),
     # DPU
     **{
         f"{sensor}_{measurement}": SensorEntityDescription(
