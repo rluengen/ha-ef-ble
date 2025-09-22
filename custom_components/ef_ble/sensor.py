@@ -71,6 +71,7 @@ def _create_shp2_backup_channel_sensors():
                     translation_key="backup_relay1_count",
                     translation_placeholders={"channel": f"{i}"},
                     entity_registry_enabled_default=False,
+                    entity_category=EntityCategory.DIAGNOSTIC,
                 ),
                 f"ch{i}_backup_rly2_cnt": SensorEntityDescription(
                     key=f"ch{i}_backup_rly2_cnt",
@@ -78,6 +79,7 @@ def _create_shp2_backup_channel_sensors():
                     translation_key="backup_relay2_count",
                     translation_placeholders={"channel": f"{i}"},
                     entity_registry_enabled_default=False,
+                    entity_category=EntityCategory.DIAGNOSTIC,
                 ),
                 f"ch{i}_wake_up_charge_status": SensorEntityDescription(
                     key=f"ch{i}_wake_up_charge_status",
@@ -93,6 +95,7 @@ def _create_shp2_backup_channel_sensors():
                     translation_key="backup_connector_type",
                     translation_placeholders={"channel": f"{i}"},
                     entity_registry_enabled_default=False,
+                    entity_category=EntityCategory.DIAGNOSTIC,
                 ),
             }
         )
@@ -112,12 +115,14 @@ def _create_shp2_channel_sensors():
                     translation_key="channel_serial_number",
                     translation_placeholders={"channel": f"{i}"},
                     entity_registry_enabled_default=False,
+                    entity_category=EntityCategory.DIAGNOSTIC,
                 ),
                 f"channel{i}_type": SensorEntityDescription(
                     key=f"channel{i}_type",
                     translation_key="channel_device_type",
                     translation_placeholders={"channel": f"{i}"},
                     entity_registry_enabled_default=False,
+                    entity_category=EntityCategory.DIAGNOSTIC,
                 ),
                 f"channel{i}_capacity": SensorEntityDescription(
                     key=f"channel{i}_capacity",
