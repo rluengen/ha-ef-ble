@@ -38,46 +38,49 @@ def _create_shp2_binary_sensors():
     # Energy binary sensors
     for i in range(1, shp2.Device.NUM_OF_CHANNELS + 1):
         sensors.update({
-            f"energy{i}_is_enable": BinarySensorEntityDescription(
-                key=f"energy{i}_is_enable",
-                name=f"Energy {i} Enabled",
+            f"channel{i}_is_enabled": BinarySensorEntityDescription(
+                key=f"channel{i}_is_enabled",
+                name=f"Channel {i} Enabled",
                 device_class=BinarySensorDeviceClass.POWER,
             ),
-            f"energy{i}_is_connect": BinarySensorEntityDescription(
-                key=f"energy{i}_is_connect",
-                name=f"Energy {i} Connected",
+            f"channel{i}_is_connected": BinarySensorEntityDescription(
+                key=f"channel{i}_is_connected",
+                name=f"Channel {i} Connected",
                 device_class=BinarySensorDeviceClass.CONNECTIVITY,
             ),
-            f"energy{i}_is_ac_open": BinarySensorEntityDescription(
-                key=f"energy{i}_is_ac_open",
-                name=f"Energy {i} AC Output",
+            f"channel{i}_is_ac_open": BinarySensorEntityDescription(
+                key=f"channel{i}_is_ac_open",
+                name=f"Channel {i} AC Output",
                 device_class=BinarySensorDeviceClass.POWER,
                 entity_registry_enabled_default=False,
             ),
-            f"energy{i}_is_power_output": BinarySensorEntityDescription(
-                key=f"energy{i}_is_power_output",
-                name=f"Energy {i} Power Output",
-                device_class=BinarySensorDeviceClass.POWER,
-            ),
-            f"energy{i}_is_grid_charge": BinarySensorEntityDescription(
-                key=f"energy{i}_is_grid_charge",
-                name=f"Energy {i} Grid Charging",
-                device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
-            ),
-            f"energy{i}_is_mppt_charge": BinarySensorEntityDescription(
-                key=f"energy{i}_is_mppt_charge",
-                name=f"Energy {i} Solar Charging",
-                device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
-            ),
-            f"energy{i}_ems_chg_flag": BinarySensorEntityDescription(
-                key=f"energy{i}_ems_chg_flag",
-                name=f"Energy {i} EMS Charge Flag",
+            f"channel{i}_is_power_output": BinarySensorEntityDescription(
+                key=f"channel{i}_is_power_output",
+                name=f"Channel {i} Power Output",
                 device_class=BinarySensorDeviceClass.POWER,
                 entity_registry_enabled_default=False,
             ),
-            f"energy{i}_hw_connect": BinarySensorEntityDescription(
-                key=f"energy{i}_hw_connect",
-                name=f"Energy {i} Hardware Connected",
+            f"channel{i}_is_grid_charge": BinarySensorEntityDescription(
+                key=f"channel{i}_is_grid_charge",
+                name=f"Channel {i} Grid Charging",
+                device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
+                entity_registry_enabled_default=False,
+            ),
+            f"channel{i}_is_mppt_charge": BinarySensorEntityDescription(
+                key=f"channel{i}_is_mppt_charge",
+                name=f"Channel {i} Solar Charging",
+                device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
+                entity_registry_enabled_default=False,
+            ),
+            f"channel{i}_ems_charging": BinarySensorEntityDescription(
+                key=f"channel{i}_ems_charging",
+                name=f"Channel {i} EMS Charging Flag",
+                device_class=BinarySensorDeviceClass.POWER,
+                entity_registry_enabled_default=False,
+            ),
+            f"channel{i}_hw_connected": BinarySensorEntityDescription(
+                key=f"channel{i}_hw_connected",
+                name=f"Channel {i} Hardware Connected",
                 device_class=BinarySensorDeviceClass.CONNECTIVITY,
                 entity_registry_enabled_default=False,
             ),

@@ -388,18 +388,18 @@
       "backup_ctrl_status": {
         "name": "Channel {channel} Control Status",
         "state": {
-          "backup_ch_off": "Off",
-          "backup_ch_discharge": "Discharging",
-          "backup_ch_charge": "Charging",
-          "backup_ch_em_stop": "Emergency Stop",
-          "backup_ch_standby": "Standby"
+          "off": "Off",
+          "discharge": "Discharging",
+          "charge": "Charging",
+          "emergency_stop": "Emergency Stop",
+          "standby": "Standby"
         }
       },
       "backup_force_charge": {
         "name": "Channel {channel} Force Charge",
         "state": {
-          "force_charge_off": "Off",
-          "force_charge_on": "On"
+          "off": "Off",
+          "on": "On"
         }
       },
       "backup_relay1_count": {
@@ -414,97 +414,41 @@
       "backup_connector_type": {
         "name": "Channel {channel} Connector Type"
       },
-      "energy_serial_number": {
-        "name": "Energy {energy} Serial Number"
+      "channel_serial_number": {
+        "name": "Channel {channel} Serial Number"
       },
-      "energy_device_type": {
-        "name": "Energy {energy} Device Type"
+      "channel_device_type": {
+        "name": "Channel {channel} Device Type"
       },
-      "energy_full_capacity": {
-        "name": "Energy {energy} Full Capacity"
+      "channel_full_capacity": {
+        "name": "Channel {channel} Full Capacity"
       },
-      "energy_rated_power": {
-        "name": "Energy {energy} Rated Power"
+      "channel_rated_power": {
+        "name": "Channel {channel} Rated Power"
       },
-      "energy_enabled": {
-        "name": "Energy {energy} Enabled",
-        "state": {
-          "disabled": "Disabled",
-          "enabled": "Enabled"
-        }
+      "channel_battery_level": {
+        "name": "Channel {channel} Battery Level"
       },
-      "energy_connected": {
-        "name": "Energy {energy} Connected",
-        "state": {
-          "disconnected": "Disconnected",
-          "connected": "Connected"
-        }
+      "channel_output_power": {
+        "name": "Channel {channel} Output Power"
       },
-      "energy_ac_output": {
-        "name": "Energy {energy} AC Output",
-        "state": {
-          "closed": "Closed",
-          "open": "Open"
-        }
+      "channel_battery_temperature": {
+        "name": "Channel {channel} Battery Temperature"
       },
-      "energy_power_output": {
-        "name": "Energy {energy} Power Output",
-        "state": {
-          "off": "Off",
-          "on": "On"
-        }
+      "channel_lcd_input_power": {
+        "name": "Channel {channel} LCD Input Power"
       },
-      "energy_grid_charging": {
-        "name": "Energy {energy} Grid Charging",
-        "state": {
-          "off": "Off",
-          "on": "On"
-        }
+      "channel_pv_input_power": {
+        "name": "Channel {channel} PV Input Power"
       },
-      "energy_solar_charging": {
-        "name": "Energy {energy} Solar Charging",
-        "state": {
-          "off": "Off",
-          "on": "On"
-        }
+      "channel_pv_lv_input_power": {
+        "name": "Channel {channel} PV LV Input Power"
       },
-      "energy_battery_level": {
-        "name": "Energy {energy} Battery Level"
+      "channel_pv_hv_input_power": {
+        "name": "Channel {channel} PV HV Input Power"
       },
-      "energy_output_power": {
-        "name": "Energy {energy} Output Power"
-      },
-      "energy_ems_charge_flag": {
-        "name": "Energy {energy} EMS Charge Flag",
-        "state": {
-          "off": "Off",
-          "on": "On"
-        }
-      },
-      "energy_hw_connected": {
-        "name": "Energy {energy} Hardware Connected",
-        "state": {
-          "disconnected": "Disconnected",
-          "connected": "Connected"
-        }
-      },
-      "energy_battery_temperature": {
-        "name": "Energy {energy} Battery Temperature"
-      },
-      "energy_lcd_input_power": {
-        "name": "Energy {energy} LCD Input Power"
-      },
-      "energy_pv_input_power": {
-        "name": "Energy {energy} PV Input Power"
-      },
-      "energy_pv_lv_input_power": {
-        "name": "Energy {energy} PV LV Input Power"
-      },
-      "energy_pv_hv_input_power": {
-        "name": "Energy {energy} PV HV Input Power"
-      },
-      "energy_error_count": {
-        "name": "Energy {energy} Error Count"
+      "channel_error_count": {
+        "name": "Channel {channel} Error Count"
       }
     },
     "select": {

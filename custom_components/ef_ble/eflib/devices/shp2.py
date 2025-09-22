@@ -13,10 +13,25 @@ from ..props import (
     repeated_pb_field_type,
 )
 from ..props.protobuf_field import TransformIfMissing
+from ..props.enums import IntFieldValue
 
 pb_time = proto_attr_mapper(pd303_pb2.ProtoTime)
 pb_push_set = proto_attr_mapper(pd303_pb2.ProtoPushAndSet)
 
+class ControlStatus(IntFieldValue):
+    UNKNOWN = -1
+
+    OFF = 0
+    DISCHARGE = 1
+    CHARGE = 2
+    EMERGENCY_STOP = 3
+    STANDBY = 4
+
+class ForceChargeStatus(IntFieldValue):
+    UNKNOWN = -1
+
+    OFF = 0;
+    ON = 1;
 
 @dataclass
 class CircuitPowerField(
@@ -91,94 +106,94 @@ class Device(DeviceBase, ProtobufProps):
     channel_power_3 = ChannelPowerField(2)
 
     # Input 1
-    energy1_sn = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.model_info.sn)
-    energy1_type = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.type)
-    energy1_capacity = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.full_cap)
-    energy1_rate_power = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.rate_power)
-    energy1_is_enabled = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_enable)
-    energy1_is_connected = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_connect)
-    energy1_is_ac_open = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_ac_open)
-    energy1_is_power_output = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_power_output)
-    energy1_is_grid_charge = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_grid_charge)
-    energy1_is_mppt_charge = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_mppt_charge)
-    energy1_battery_percentage = pb_field(pb_push_set.backup_incre_info.Energy1_info.battery_percentage)
-    energy1_output_power = pb_field(pb_push_set.backup_incre_info.Energy1_info.output_power)
-    energy1_ems_charging = pb_field(pb_push_set.backup_incre_info.Energy1_info.ems_chg_flag)
-    energy1_hw_connect = pb_field(pb_push_set.backup_incre_info.Energy1_info.hw_connect)
-    energy1_battery_temp = pb_field(pb_push_set.backup_incre_info.Energy1_info.ems_bat_temp)
-    energy1_lcd_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.lcd_input_watts)
-    energy1_pv_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.pv_charge_watts)
-    energy1_pv_lv_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.pv_low_charge_watts)
-    energy1_pv_hv_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.pv_height_charge_watts)
-    energy1_error_code = pb_field(pb_push_set.backup_incre_info.Energy1_info.error_code_num)
+    channel1_sn = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.model_info.sn)
+    channel1_type = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.type)
+    channel1_capacity = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.full_cap)
+    channel1_rate_power = pb_field(pb_push_set.backup_incre_info.Energy1_info.dev_info.rate_power)
+    channel1_is_enabled = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_enable)
+    channel1_is_connected = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_connect)
+    channel1_is_ac_open = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_ac_open)
+    channel1_is_power_output = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_power_output)
+    channel1_is_grid_charge = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_grid_charge)
+    channel1_is_mppt_charge = pb_field(pb_push_set.backup_incre_info.Energy1_info.is_mppt_charge)
+    channel1_battery_percentage = pb_field(pb_push_set.backup_incre_info.Energy1_info.battery_percentage)
+    channel1_output_power = pb_field(pb_push_set.backup_incre_info.Energy1_info.output_power)
+    channel1_ems_charging = pb_field(pb_push_set.backup_incre_info.Energy1_info.ems_chg_flag)
+    channel1_hw_connect = pb_field(pb_push_set.backup_incre_info.Energy1_info.hw_connect)
+    channel1_battery_temp = pb_field(pb_push_set.backup_incre_info.Energy1_info.ems_bat_temp)
+    channel1_lcd_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.lcd_input_watts)
+    channel1_pv_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.pv_charge_watts)
+    channel1_pv_lv_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.pv_low_charge_watts)
+    channel1_pv_hv_input = pb_field(pb_push_set.backup_incre_info.Energy1_info.pv_height_charge_watts)
+    channel1_error_code = pb_field(pb_push_set.backup_incre_info.Energy1_info.error_code_num)
 
     ch1_backup_is_ready = pb_field(pb_push_set.backup_incre_info.ch1_info.backup_is_ready)
-    ch1_ctrl_status = pb_field(pb_push_set.backup_incre_info.ch1_info.ctrl_sta)
-    ch1_force_charge = pb_field(pb_push_set.backup_incre_info.ch1_info.force_charge_sta)
+    ch1_ctrl_status = pb_field(pb_push_set.backup_incre_info.ch1_info.ctrl_sta, ControlStatus.from_value)
+    ch1_force_charge = pb_field(pb_push_set.backup_incre_info.ch1_info.force_charge_sta, ForceChargeStatus.from_value)
     ch1_backup_rly1_cnt = pb_field(pb_push_set.backup_incre_info.ch1_info.backup_rly1_cnt)
     ch1_backup_rly2_cnt = pb_field(pb_push_set.backup_incre_info.ch1_info.backup_rly2_cnt)
     ch1_wake_up_charge_status = pb_field(pb_push_set.backup_incre_info.ch1_info.wake_up_charge_sta)
-    ch1_energy_5p8_type = pb_field(pb_push_set.backup_incre_info.ch1_info.energy_5p8_type)
+    ch1_channel_5p8_type = pb_field(pb_push_set.backup_incre_info.ch1_info.energy_5p8_type)
 
     # Input 2
-    energy2_sn = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.model_info.sn)
-    energy2_type = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.type)
-    energy2_capacity = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.full_cap)
-    energy2_rate_power = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.rate_power)
-    energy2_is_enabled = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_enable)
-    energy2_is_connected = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_connect)
-    energy2_is_ac_open = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_ac_open)
-    energy2_is_power_output = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_power_output)
-    energy2_is_grid_charge = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_grid_charge)
-    energy2_is_mppt_charge = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_mppt_charge)
-    energy2_battery_percentage = pb_field(pb_push_set.backup_incre_info.Energy2_info.battery_percentage)
-    energy2_output_power = pb_field(pb_push_set.backup_incre_info.Energy2_info.output_power)
-    energy2_ems_charging = pb_field(pb_push_set.backup_incre_info.Energy2_info.ems_chg_flag)
-    energy2_hw_connect = pb_field(pb_push_set.backup_incre_info.Energy2_info.hw_connect)
-    energy2_battery_temp = pb_field(pb_push_set.backup_incre_info.Energy2_info.ems_bat_temp)
-    energy2_lcd_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.lcd_input_watts)
-    energy2_pv_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.pv_charge_watts)
-    energy2_pv_lv_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.pv_low_charge_watts)
-    energy2_pv_hv_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.pv_height_charge_watts)
-    energy2_error_code = pb_field(pb_push_set.backup_incre_info.Energy2_info.error_code_num)
+    channel2_sn = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.model_info.sn)
+    channel2_type = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.type)
+    channel2_capacity = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.full_cap)
+    channel2_rate_power = pb_field(pb_push_set.backup_incre_info.Energy2_info.dev_info.rate_power)
+    channel2_is_enabled = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_enable)
+    channel2_is_connected = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_connect)
+    channel2_is_ac_open = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_ac_open)
+    channel2_is_power_output = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_power_output)
+    channel2_is_grid_charge = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_grid_charge)
+    channel2_is_mppt_charge = pb_field(pb_push_set.backup_incre_info.Energy2_info.is_mppt_charge)
+    channel2_battery_percentage = pb_field(pb_push_set.backup_incre_info.Energy2_info.battery_percentage)
+    channel2_output_power = pb_field(pb_push_set.backup_incre_info.Energy2_info.output_power)
+    channel2_ems_charging = pb_field(pb_push_set.backup_incre_info.Energy2_info.ems_chg_flag)
+    channel2_hw_connect = pb_field(pb_push_set.backup_incre_info.Energy2_info.hw_connect)
+    channel2_battery_temp = pb_field(pb_push_set.backup_incre_info.Energy2_info.ems_bat_temp)
+    channel2_lcd_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.lcd_input_watts)
+    channel2_pv_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.pv_charge_watts)
+    channel2_pv_lv_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.pv_low_charge_watts)
+    channel2_pv_hv_input = pb_field(pb_push_set.backup_incre_info.Energy2_info.pv_height_charge_watts)
+    channel2_error_code = pb_field(pb_push_set.backup_incre_info.Energy2_info.error_code_num)
 
     ch2_backup_is_ready = pb_field(pb_push_set.backup_incre_info.ch2_info.backup_is_ready)
-    ch2_ctrl_status = pb_field(pb_push_set.backup_incre_info.ch2_info.ctrl_sta)
-    ch2_force_charge = pb_field(pb_push_set.backup_incre_info.ch2_info.force_charge_sta)
+    ch2_ctrl_status = pb_field(pb_push_set.backup_incre_info.ch2_info.ctrl_sta, ControlStatus.from_value)
+    ch2_force_charge = pb_field(pb_push_set.backup_incre_info.ch2_info.force_charge_sta, ForceChargeStatus.from_value)
     ch2_backup_rly1_cnt = pb_field(pb_push_set.backup_incre_info.ch2_info.backup_rly1_cnt)
     ch2_backup_rly2_cnt = pb_field(pb_push_set.backup_incre_info.ch2_info.backup_rly2_cnt)
     ch2_wake_up_charge_status = pb_field(pb_push_set.backup_incre_info.ch2_info.wake_up_charge_sta)
-    ch2_energy_5p8_type = pb_field(pb_push_set.backup_incre_info.ch2_info.energy_5p8_type)
+    ch2_channel_5p8_type = pb_field(pb_push_set.backup_incre_info.ch2_info.energy_5p8_type)
 
     # Input 3
-    energy3_sn = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.model_info.sn)
-    energy3_type = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.type)
-    energy3_capacity = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.full_cap)
-    energy3_rate_power = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.rate_power)
-    energy3_is_enabled = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_enable)
-    energy3_is_connected = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_connect)
-    energy3_is_ac_open = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_ac_open)
-    energy3_is_power_output = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_power_output)
-    energy3_is_grid_charge = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_grid_charge)
-    energy3_is_mppt_charge = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_mppt_charge)
-    energy3_battery_percentage = pb_field(pb_push_set.backup_incre_info.Energy3_info.battery_percentage)
-    energy3_output_power = pb_field(pb_push_set.backup_incre_info.Energy3_info.output_power)
-    energy3_ems_charging = pb_field(pb_push_set.backup_incre_info.Energy3_info.ems_chg_flag)
-    energy3_hw_connect = pb_field(pb_push_set.backup_incre_info.Energy3_info.hw_connect)
-    energy3_battery_temp = pb_field(pb_push_set.backup_incre_info.Energy3_info.ems_bat_temp)
-    energy3_lcd_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.lcd_input_watts)
-    energy3_pv_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.pv_charge_watts)
-    energy3_pv_lv_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.pv_low_charge_watts)
-    energy3_pv_hv_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.pv_height_charge_watts)
-    energy3_error_code = pb_field(pb_push_set.backup_incre_info.Energy3_info.error_code_num)
+    channel3_sn = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.model_info.sn)
+    channel3_type = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.type)
+    channel3_capacity = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.full_cap)
+    channel3_rate_power = pb_field(pb_push_set.backup_incre_info.Energy3_info.dev_info.rate_power)
+    channel3_is_enabled = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_enable)
+    channel3_is_connected = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_connect)
+    channel3_is_ac_open = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_ac_open)
+    channel3_is_power_output = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_power_output)
+    channel3_is_grid_charge = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_grid_charge)
+    channel3_is_mppt_charge = pb_field(pb_push_set.backup_incre_info.Energy3_info.is_mppt_charge)
+    channel3_battery_percentage = pb_field(pb_push_set.backup_incre_info.Energy3_info.battery_percentage)
+    channel3_output_power = pb_field(pb_push_set.backup_incre_info.Energy3_info.output_power)
+    channel3_ems_charging = pb_field(pb_push_set.backup_incre_info.Energy3_info.ems_chg_flag)
+    channel3_hw_connect = pb_field(pb_push_set.backup_incre_info.Energy3_info.hw_connect)
+    channel3_battery_temp = pb_field(pb_push_set.backup_incre_info.Energy3_info.ems_bat_temp)
+    channel3_lcd_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.lcd_input_watts)
+    channel3_pv_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.pv_charge_watts)
+    channel3_pv_lv_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.pv_low_charge_watts)
+    channel3_pv_hv_input = pb_field(pb_push_set.backup_incre_info.Energy3_info.pv_height_charge_watts)
+    channel3_error_code = pb_field(pb_push_set.backup_incre_info.Energy3_info.error_code_num)
 
     ch3_backup_is_ready = pb_field(pb_push_set.backup_incre_info.ch3_info.backup_is_ready)
-    ch3_ctrl_status = pb_field(pb_push_set.backup_incre_info.ch3_info.ctrl_sta)
-    ch3_force_charge = pb_field(pb_push_set.backup_incre_info.ch3_info.force_charge_sta)
+    ch3_ctrl_status = pb_field(pb_push_set.backup_incre_info.ch3_info.ctrl_sta, ControlStatus.from_value)
+    ch3_force_charge = pb_field(pb_push_set.backup_incre_info.ch3_info.force_charge_sta, ForceChargeStatus.from_value)
     ch3_backup_rly1_cnt = pb_field(pb_push_set.backup_incre_info.ch3_info.backup_rly1_cnt)
     ch3_backup_rly2_cnt = pb_field(pb_push_set.backup_incre_info.ch3_info.backup_rly2_cnt)
     ch3_wake_up_charge_status = pb_field(pb_push_set.backup_incre_info.ch3_info.wake_up_charge_sta)
-    ch3_energy_5p8_type = pb_field(pb_push_set.backup_incre_info.ch3_info.energy_5p8_type)
+    ch3_5p8_type = pb_field(pb_push_set.backup_incre_info.ch3_info.energy_5p8_type)
 
     in_use_power = pb_field(pb_time.watt_info.all_hall_watt)
     grid_power = pb_field(
@@ -274,8 +289,17 @@ class Device(DeviceBase, ProtobufProps):
             )
 
         for field_name in self.updated_fields:
-            self.update_callback(field_name)
-            self.update_state(field_name, getattr(self, field_name))
+            try:
+                self.update_callback(field_name)
+                self.update_state(field_name, getattr(self, field_name))
+            except Exception as e:
+                self._logger.warning(
+                    "%s: %s: Error happened while updating field %s: %s",
+                    self.address,
+                    self.name,
+                    field_name,
+                    e,
+                )
 
         return processed
 
