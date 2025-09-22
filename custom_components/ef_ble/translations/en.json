@@ -160,6 +160,41 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "channel_backup_is_ready": {
+        "name": "Channel {channel} Backup Ready"
+      },
+      "channel_is_enabled": {
+        "name": "Channel {channel} Enabled"
+      },
+      "channel_is_connected": {
+        "name": "Channel {channel} Connected"
+      },
+      "channel_is_ac_open": {
+        "name": "Channel {channel} AC Output"
+      },
+      "channel_is_power_output": {
+        "name": "Channel {channel} Power Output"
+      },
+      "channel_is_grid_charge": {
+        "name": "Channel {channel} Grid Charging"
+      },
+      "channel_is_mppt_charge": {
+        "name": "Channel {channel} Solar Charging"
+      },
+      "channel_ems_charging": {
+        "name": "Channel {channel} EMS Charging"
+      },
+      "channel_hw_connected": {
+        "name": "Channel {channel} Hardware Connected"
+      },
+      "error_happened": {
+        "name": "Error"
+      },
+      "plugged_in_ac": {
+        "name": "AC Plugged In"
+      }
+    },
     "sensor": {
       "battery_level": {
         "name": "Battery Level"
@@ -438,8 +473,14 @@
       "channel_lcd_input_power": {
         "name": "Channel {channel} LCD Input Power"
       },
-      "channel_pv_input_power": {
-        "name": "Channel {channel} PV Input Power"
+      "channel_pv_status": {
+        "name": "Channel {channel} PV Status",
+        "state": {
+          "none": "None",
+          "lv": "LV",
+          "hv": "HV",
+          "lv_and_hv": "LV&HV"
+        }
       },
       "channel_pv_lv_input_power": {
         "name": "Channel {channel} PV LV Input Power"
