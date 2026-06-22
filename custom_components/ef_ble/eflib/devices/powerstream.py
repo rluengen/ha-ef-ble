@@ -34,13 +34,7 @@ class Device(DeviceBase, ProtobufProps):
     pv_current_2 = pb_field(pb.pv2_input_cur, pdiv(10, 1))
     pv_temperature_2 = pb_field(pb.pv2_temp, pdiv(10, 1))
 
-    # `f32_lcd_show_soc` tracks the cloud / Delta 2 Max SoC most closely but is not
-    # reported by every PowerStream (e.g. the 600W on FW 1.0.1.288, see #369), which
-    # left the battery level "Unknown". The default is back on the always-present
-    # `f32_show_soc`; the other SoC fields are exposed as diagnostic sensors below.
-    battery_level = pb_field(pb_inv2.new_psdr_heartbeat.f32_show_soc, pround(2))
-    lcd_battery_level = pb_field(pb_inv2.new_psdr_heartbeat.f32_lcd_show_soc, pround(2))
-    bms_battery_level = pb_field(pb.bat_soc)
+    battery_level = pb_field(pb_inv2.new_psdr_heartbeat.f32_lcd_show_soc, pround(2))
     battery_power = pb_field(pb.bat_input_watts, pdiv(10, 1))
     battery_temperature = pb_field(pb.bat_temp, pdiv(10, 1))
 
