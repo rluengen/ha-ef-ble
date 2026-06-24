@@ -74,6 +74,8 @@ class DeviceBase(abc.ABC):
 
         self._logger = DeviceLogger(self)
         self._logging_options = LogOptions.no_options()
+        # Set for devices that use the certificate/token BLE auth (see connection.py).
+        self._bind_data_provider = None
 
         self._logger.debug(
             "Creating new device: %s (%s)",
@@ -143,6 +145,21 @@ class DeviceBase(abc.ABC):
     @property
     def auth_header_dst(self) -> int:
         return 0x35
+
+    @property
+    def uses_cert_auth(self) -> bool:
+        """Whether this device uses the certificate/token BLE auth (vs legacy md5)."""
+        return False
+
+    @property
+    def uses_machine_auth(self) -> bool:
+        """
+        Whether this device uses local "machine" BLE auth (Power Kit, no cloud).
+
+        The device issues its own per-(user, device) signature over BLE which is
+        replayed to authenticate; see ``connection.py._machine_get_signature``.
+        """
+        return False
 
     @property
     def connection_state(self):
@@ -231,6 +248,19 @@ class DeviceBase(abc.ABC):
         )
         return self
 
+    def with_bind_data_provider(self, provider):
+        """
+        Enable certificate/token BLE auth using `provider` to fetch cloud bind data.
+
+        `provider` is an async callable `(sn) -> BleBindData | None` (see
+        ``eflib/cloud.py``). When set, the connection uses the cert/token handshake
+        instead of the legacy md5 auth.
+        """
+        self._bind_data_provider = provider
+        if self._conn is not None:
+            self._conn._bind_data_provider = provider
+        return self
+
     def with_enabled_packet_diagnostics(
         self, enabled: bool = True, buffer_size: int = 100
     ):
@@ -279,6 +309,8 @@ class DeviceBase(abc.ABC):
                     packet_version=self.packet_version,
                     encrypt_type=self.scan_record.encrypt_type,
                     auth_header_dst=self.auth_header_dst,
+                    bind_data_provider=self._bind_data_provider,
+                    uses_machine_auth=self.uses_machine_auth,
                 )
                 .with_logging_options(self._logger.options)
                 .with_disabled_reconnect(self._reconnect_disabled)

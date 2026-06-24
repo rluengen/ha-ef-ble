@@ -187,5 +187,10 @@ ECOFLOW_DEVICE_LIST = {
     "C373":{"name": "EcoFlow PowerPulse 22KW Pro", "packets": "?"},
     "C374":{"name": "EcoFlow PowerPulse 22KW Meter", "packets": "?"},
     "C376":{"name": "EcoFlow PowerPulse 11KW Meter", "packets": "?"},
+
+    # =====================
+    # POWER KIT
+    # =====================
+    "M3H1":{"name": "EcoFlow Power Hub", "packets": "v3"},
 }
 # fmt: on

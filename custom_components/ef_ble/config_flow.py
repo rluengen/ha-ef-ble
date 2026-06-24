@@ -35,7 +35,9 @@ from homeassistant.helpers.storage import Store
 
 from . import eflib
 from .const import (
+    CONF_ACCESS_TOKEN,
     CONF_ADVANCED_CONNECTION_OPTIONS,
+    CONF_API_HOST,
     CONF_BLUEZ_START_NOTIFY,
     CONF_COLLECT_PACKETS,
     CONF_COLLECT_PACKETS_AMOUNT,
@@ -105,6 +107,8 @@ class EFBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         self._local_names: dict[str, str] = {}
 
         self._user_id: str = ""
+        self._access_token: str = ""
+        self._base_url: str = ""
         self._email: str = ""
         self._user_id_validated: bool = False
         self._log_options = LogOptions.no_options()
@@ -389,6 +393,11 @@ class EFBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         entry_data["local_name"] = self._local_names.get(device.address, None)
         entry_data.pop("login", None)
 
+        # Persist cloud creds for the certificate/token BLE auth (set via the login step).
+        if self._access_token:
+            entry_data[CONF_ACCESS_TOKEN] = self._access_token
+            entry_data[CONF_API_HOST] = self._base_url
+
         if CONF_EXTRA_BATTERY not in entry_data:
             entry_data[CONF_EXTRA_BATTERY] = _find_enabled_batteries(
                 device, range(1, 6)
@@ -516,6 +525,10 @@ class EFBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         if result.error or result.user_id is None:
             return {"login": result.error or "Login failed"}
         self._user_id = result.user_id
+        # Kept for the certificate/token BLE auth (Power Kit / "Space" devices), which
+        # needs an authenticated cloud call at connect time.
+        self._access_token = result.access_token or ""
+        self._base_url = result.base_url or ""
         self._email = ""
         self._collapsed = True
         return {}

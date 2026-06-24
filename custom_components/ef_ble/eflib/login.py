@@ -38,6 +38,8 @@ class Region(StrEnum):
 @dataclass(frozen=True)
 class LoginResult:
     user_id: str | None = None
+    access_token: str | None = None
+    base_url: str | None = None
     error: str | None = None
 
 
@@ -118,4 +120,18 @@ class EcoFlowLogin:
             if result_json["code"] != "0":
                 return LoginResult(error=f"Login failed: '{result_json['message']}'")
 
-            return LoginResult(user_id=result_json["data"]["user"]["userId"])
+            data = result_json["data"]
+            user = data.get("user", {})
+            # The certificate/token BLE auth (Power Kit / "Space" devices) needs the
+            # account access token; older devices only need the user id.
+            access_token = (
+                data.get("token")
+                or data.get("access_token")
+                or user.get("token")
+                or user.get("accessToken")
+            )
+            return LoginResult(
+                user_id=user["userId"],
+                access_token=access_token,
+                base_url=base_url,
+            )

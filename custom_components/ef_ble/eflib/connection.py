@@ -45,6 +45,7 @@ from .frame_assembler import (
 from .listeners import ListenerGroup, ListenerRegistry
 from .logging_util import ConnectionLogger, LogOptions, caller_chain
 from .packet import Packet
+from .pb import iot_comm_pb2
 from .props.utils import classproperty
 
 MAX_RECONNECT_ATTEMPTS = 2
@@ -225,6 +226,8 @@ class Connection:
         packet_version: int = 0x03,
         encrypt_type: int = 7,
         auth_header_dst: int = 0x35,
+        bind_data_provider: "Callable[[str], Awaitable[Any]] | None" = None,
+        uses_machine_auth: bool = False,
     ) -> None:
         self._ble_dev = ble_dev
         self._address = ble_dev.address
@@ -235,6 +238,16 @@ class Connection:
         self._packet_parse = packet_parse
         self._packet_version = packet_version
         self._encrypt_type = encrypt_type
+        # When set, the device uses the certificate/token BLE auth (Power Kit /
+        # "Space" devices) instead of the legacy md5(userId+sn) handshake. The
+        # provider fetches the cloud bind blob (randomCode + userInfoEn) for a SN.
+        self._bind_data_provider = bind_data_provider
+        self._cert_user_token = ""
+        # When set, the device authenticates fully locally over BLE (no cloud): it
+        # issues its own per-(user, device) signature via getSignatureInfo (cmd
+        # 0xA8) which we replay as the auth secret key (cmd 0x86). Used by Power Kit
+        # "machine" devices (e.g. Power Hub). See ``_machine_get_signature``.
+        self._uses_machine_auth = uses_machine_auth
         self._encryption: EncryptionStrategy | None = None
         self._initial_session_key: bytes = b""
         self._simple_assembler = SimplePacketAssembler()
@@ -1060,7 +1073,12 @@ class Connection:
             "getAuthStatusHandler: data: %r",
             data,
         )
-        await self.autoAuthentication()
+        if self._uses_machine_auth:
+            await self._machine_get_signature()
+        elif self._bind_data_provider is not None:
+            await self._cert_refresh_and_auth()
+        else:
+            await self.autoAuthentication()
 
     async def autoAuthentication(self):
         self._set_state(ConnectionState.AUTHENTICATING)
@@ -1088,6 +1106,208 @@ class Connection:
 
         # Sending request and starting the common listener
         await self.sendPacket(packet, self.listenForDataHandler)
+
+    # Length of the getSignatureInfo (0xA8) reply, and field offsets within it.
+    _MACHINE_SIG_REPLY_LEN = 134
+    _MACHINE_CMD_GET_SIGNATURE = 0xA8
+    _MACHINE_CMD_SET_AUTH = 0x86
+
+    async def _machine_get_signature(self):
+        """
+        Local (no-cloud) BLE auth for Power Kit "machine" devices (e.g. Power Hub).
+
+        Unlike the cloud cert/token path, the device itself issues a
+        per-(user, device) signature: we send ``getSignatureInfo`` (cmd 0xA8)
+        carrying our numeric account id + a unix timestamp, the device replies
+        with a ``signatureDigest`` which we then replay as the auth secret key
+        (cmd 0x86, the same command the legacy md5 auth uses). Reverse-engineered
+        from the EcoFlow app's ``EFBleAuthHelper.bleAuthNormal`` /
+        ``BleAuthMachineHandler`` -> ``e6.b.getSignatureInfo`` path; no cloud call
+        is involved.
+        """
+        self._set_state(ConnectionState.AUTHENTICATING)
+
+        # Payload (mirrors the app's e6.b.d): 0x01 + userId (ASCII decimal,
+        # left-aligned in a 64-byte zero buffer) + unix time in SECONDS as a
+        # little-endian uint32.
+        user_id_field = (self._user_id or "").encode("ascii")[:64].ljust(64, b"\x00")
+        timestamp = struct.pack("<I", int(time.time()))
+        payload = b"\x01" + user_id_field + timestamp
+
+        self._logger.info(
+            "machine auth: requesting device signature (getSignatureInfo 0xA8)"
+        )
+        packet = Packet(
+            0x21,
+            self._auth_header_dst,
+            0x35,
+            self._MACHINE_CMD_GET_SIGNATURE,
+            payload,
+            0x01,
+            0x01,
+            self._packet_version,
+        )
+        await self.sendPacket(packet, self._machineSigHandler)
+
+    @_auth_handler(ConnectionState.AUTHENTICATING)
+    async def _machineSigHandler(
+        self, characteristic: BleakGATTCharacteristic, recv_data: bytearray
+    ):
+        await self._client.stop_notify(self._notify_characteristic)
+        packets = await self.parseEncPackets(bytes(recv_data))
+        if len(packets) < 1:
+            raise PacketReceiveError
+
+        # The signature reply echoes cmd 0xA8; pick it out (a device may emit other
+        # frames around it), else fall back to the first packet.
+        packet = next(
+            (p for p in packets if p.cmd_id == self._MACHINE_CMD_GET_SIGNATURE),
+            packets[0],
+        )
+        payload = packet.payload
+
+        self._logger.log_filtered(
+            LogOptions.CONNECTION_DEBUG,
+            "machine auth: signature reply cmd_id=0x%02X len=%d payload=%s",
+            packet.cmd_id,
+            len(payload),
+            payload.hex(),
+        )
+
+        if len(payload) < self._MACHINE_SIG_REPLY_LEN:
+            raise FailedToAuthenticate(
+                f"machine auth: short signature reply ({len(payload)} bytes, "
+                f"expected >= {self._MACHINE_SIG_REPLY_LEN})"
+            )
+
+        # Layout: [0]=resultCode, [1:65]=randomCode, [65:129]=signatureDigest,
+        # [129]=ver, [130:134]=timeStamp. The signatureDigest (ASCII) is replayed
+        # as the auth secret key.
+        result_code = payload[0]
+        if result_code != 0:
+            raise FailedToAuthenticate(
+                f"machine auth: getSignatureInfo resultCode={result_code}"
+            )
+
+        signature_digest = payload[65:129]
+        ver = payload[129]
+        self._logger.info(
+            "machine auth: received device signature (ver=%d), authenticating", ver
+        )
+        await self._machine_set_auth(signature_digest)
+
+    async def _machine_set_auth(self, secret_key: bytes):
+        """
+        Authenticate by replaying the device-issued signature as the secret key.
+
+        The 0x86 reply is handled by ``listenForDataHandler`` -> ``_check_auth``,
+        which sets ``AUTHENTICATED`` on success (the same path as the legacy md5
+        auth, which also uses cmd 0x86).
+        """
+        packet = Packet(
+            0x21,
+            self._auth_header_dst,
+            0x35,
+            self._MACHINE_CMD_SET_AUTH,
+            secret_key,
+            0x01,
+            0x01,
+            self._packet_version,
+        )
+        await self.sendPacket(packet, self.listenForDataHandler)
+
+    def _iot_packet(self, cmd_id: int, payload: bytes) -> Packet:
+        """Build an IotComm (cmd_set 0x35) packet for the cert/token auth."""
+        return Packet(
+            0x21,
+            self._auth_header_dst,
+            iot_comm_pb2.IotCmdSets.IOT_COMM_CMD_SETS,
+            cmd_id,
+            payload,
+            0x01,
+            0x01,
+            self._packet_version,
+        )
+
+    async def _cert_refresh_and_auth(self):
+        """
+        Certificate/token BLE auth (Power Kit / "Space" devices).
+
+        Fetches the per-device bind blob from the EcoFlow cloud, relays it via
+        ``RefreshToken`` to obtain a ``user_token``, then authenticates with it. See
+        ``eflib/cloud.py`` and ``proto/iot_comm.proto``.
+        """
+        self._set_state(ConnectionState.AUTHENTICATING)
+        self._logger.info("cert auth: fetching BLE bind data from cloud")
+        assert self._bind_data_provider is not None
+        bind = await self._bind_data_provider(self._dev_sn)
+        if bind is None:
+            raise FailedToAuthenticate("Failed to fetch BLE bind data from cloud")
+
+        msg = iot_comm_pb2.RefreshToken(
+            random_code=bind.random_code, user_info_en=bind.user_info_en
+        )
+        await self.sendPacket(
+            self._iot_packet(
+                iot_comm_pb2.IotCmdId.IOT_CMD_ID_REFRESH_TOKEN, msg.SerializeToString()
+            ),
+            self._certAuthHandler,
+        )
+
+    @_auth_handler(ConnectionState.AUTHENTICATING)
+    async def _certAuthHandler(
+        self, characteristic: BleakGATTCharacteristic, recv_data: bytearray
+    ):
+        await self._client.stop_notify(self._notify_characteristic)
+        packets = await self.parseEncPackets(bytes(recv_data))
+        if len(packets) < 1:
+            raise PacketReceiveError
+        packet = packets[0]
+
+        if packet.cmd_id == iot_comm_pb2.IotCmdId.IOT_CMD_ID_REFRESH_TOKEN:
+            ack = iot_comm_pb2.RefreshTokenAck()
+            ack.ParseFromString(packet.payload)
+            self._logger.log_filtered(
+                LogOptions.CONNECTION_DEBUG,
+                "cert auth: RefreshTokenAck result=%s",
+                ack.result,
+            )
+            if ack.result != iot_comm_pb2.IotErrCode.Success:
+                raise FailedToAuthenticate(
+                    f"cert auth: RefreshToken failed, IotErrCode={ack.result}"
+                )
+            self._cert_user_token = ack.user_token
+            msg = iot_comm_pb2.Authentication(
+                user_role=iot_comm_pb2.UserRoleType.UserRoleNormal,
+                user_token=ack.user_token,
+            )
+            await self.sendPacket(
+                self._iot_packet(
+                    iot_comm_pb2.IotCmdId.IOT_CMD_ID_AUTHENTICATION,
+                    msg.SerializeToString(),
+                ),
+                self._certAuthHandler,
+            )
+        elif packet.cmd_id == iot_comm_pb2.IotCmdId.IOT_CMD_ID_AUTHENTICATION:
+            ack = iot_comm_pb2.AuthenticationAck()
+            ack.ParseFromString(packet.payload)
+            self._logger.log_filtered(
+                LogOptions.CONNECTION_DEBUG,
+                "cert auth: AuthenticationAck result=%s",
+                ack.result,
+            )
+            if ack.result != iot_comm_pb2.IotErrCode.Success:
+                raise FailedToAuthenticate(
+                    f"cert auth: Authentication failed, IotErrCode={ack.result}"
+                )
+            self._connection_attempt = 0
+            self._reconnect_attempt = 0
+            self._set_state(ConnectionState.AUTHENTICATED)
+            self._connected.set()
+            self._logger.info("cert auth: authenticated")
+            await self._start_notify(self.listenForDataHandler)
+        else:
+            raise PacketReceiveError
 
     async def _check_auth(self, packet: Packet):
         exc = AuthErrors.from_payload(packet.payload)

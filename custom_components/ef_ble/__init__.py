@@ -22,11 +22,14 @@ from homeassistant.exceptions import (
 )
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import eflib
 from .config_flow import CONF_COLLECT_PACKETS, ConfLogOptions, LogOptions, PacketVersion
 from .const import (
+    CONF_ACCESS_TOKEN,
     CONF_ADVANCED_CONNECTION_OPTIONS,
+    CONF_API_HOST,
     CONF_BLUEZ_START_NOTIFY,
     CONF_COLLECT_PACKETS_AMOUNT,
     CONF_CONNECTION_TIMEOUT,
@@ -67,6 +70,33 @@ ConfigEntryNotReady = partial(ConfigEntryNotReady, translation_domain=DOMAIN)
 ConfigEntryError = partial(ConfigEntryError, translation_domain=DOMAIN)
 
 _REAPPEAR_CALLBACKS_KEY = f"{DOMAIN}_reappear_callbacks"
+
+
+def _attach_cert_auth_provider(
+    hass: HomeAssistant, device: eflib.DeviceBase, merged_options: dict
+) -> None:
+    """
+    Attach a cloud bind-data provider for certificate/token BLE auth devices.
+
+    Power Kit / "Space" devices (Power Hub, etc.) need an authenticated cloud call at
+    connect time to fetch the per-device bind blob; see eflib/cloud.py.
+    """
+    if not device.uses_cert_auth:
+        return
+
+    access_token = merged_options.get(CONF_ACCESS_TOKEN)
+    api_host = merged_options.get(CONF_API_HOST)
+    if access_token and api_host:
+        from .eflib.cloud import EcoFlowCloud  # noqa: PLC0415
+
+        cloud = EcoFlowCloud(async_get_clientsession(hass), api_host, access_token)
+        device.with_bind_data_provider(cloud.get_ble_bind_data)
+    else:
+        _LOGGER.warning(
+            "%s uses certificate auth but no cloud token is configured; reconfigure "
+            "the integration using the EcoFlow login step",
+            device.device,
+        )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DeviceConfigEntry) -> bool:
@@ -116,6 +146,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeviceConfigEntry) -> bo
         bluez_start_notify=advanced.get(CONF_BLUEZ_START_NOTIFY, False),
     )
     issue_id = f"{entry.entry_id}_max_connection_attempts"
+
+    _attach_cert_auth_provider(hass, device, merged_options)
 
     try:
         await (
