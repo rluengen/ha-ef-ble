@@ -650,6 +650,38 @@ Click on any device below to see available sensors, switches, and controls:
 | Water Level        |                 |             |            |
 
 </details>
+<details>
+<summary><b>Power Hub</b> <i>(Power Kit / MM100)</i></summary>
+
+<br>
+
+| *Sensors*                 | *Switches* | *Sliders* | *Selects* |
+|---------------------------|------------|-----------|-----------|
+| Battery Level             |            |           |           |
+| Input Power               |            |           |           |
+| Output Power              |            |           |           |
+| Remaining Time            |            |           |           |
+| Solar PV1 Power           |            |           |           |
+| Solar PV2 Power           |            |           |           |
+| Solar Input Power (total) |            |           |           |
+| DC Input Power            |            |           |           |
+| DC Output Power           |            |           |           |
+| AC Input Power            |            |           |           |
+| AC Output Power           |            |           |           |
+| Battery Pack Level        |            |           |           |
+| Battery Pack Voltage      |            |           |           |
+| Battery Pack Current      |            |           |           |
+| Battery Pack Temperature  |            |           |           |
+
+> [!NOTE]
+> **Experimental — work in progress (added in this fork).** The Power Hub (model
+> MM100, serial prefix `M3H1`, BLE name `EF-M35*`) authenticates fully locally over
+> BLE using the device's own on-device signature handshake — no cloud token is
+> required. Sensor values are still being validated against live captures, so units
+> and scaling may change, and write controls (switches/sliders/selects) are not yet
+> implemented.
+
+</details>
 
 <br>
 
