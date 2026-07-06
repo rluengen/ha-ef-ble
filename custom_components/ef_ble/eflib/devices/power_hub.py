@@ -114,12 +114,15 @@ class Device(DeviceBase, RawDataProps):
         # Confirm from the capture's connection log.
         return 3
 
-    @property
-    def uses_machine_auth(self):
-        # Power Kit / "Space" devices (Power Hub) authenticate fully locally over
-        # BLE: the device issues its own per-(user, device) signature which we
-        # replay to authenticate. No cloud token/cert is involved.
-        return True
+    # NOTE: The Power Hub authenticates with the standard local md5(userId + sn)
+    # handshake (see connection.autoAuthentication) - the same as other EcoFlow
+    # devices. The EcoFlow app's "machine"/getSignatureInfo (0xA8) and cloud
+    # cert/token paths were investigated but are NOT used by the consumer Power
+    # Hub: the device ignores 0xA8, and the app computes the BLE secret locally as
+    # MD5(numeric userId + sn) (decompiled from d2.o -> f0.V -> MD5). So we leave
+    # both uses_machine_auth and uses_cert_auth at their False defaults and rely on
+    # the base md5 auth. The critical requirement is that the configured user id is
+    # the *numeric* EcoFlow account id, not the account email.
 
     async def data_parse(self, packet: Packet) -> bool:
         self.reset_updated()
