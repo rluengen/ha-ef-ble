@@ -114,6 +114,13 @@ class Device(DeviceBase, RawDataProps):
         # Confirm from the capture's connection log.
         return 3
 
+    async def packet_parse(self, data: bytes):
+        # Power Hub telemetry payloads are XOR-obfuscated with seq[0] (the same scheme
+        # ~18 other EcoFlow devices use, e.g. Delta Pro / Wave 2). Undo it here so
+        # data_parse sees plaintext. Auth frames carry seq[0] == 0, so the XOR is a
+        # no-op for them and the md5 auth handshake is unaffected.
+        return Packet.from_bytes(data, xor_payload=True)
+
     # NOTE: The Power Hub authenticates with the standard local md5(userId + sn)
     # handshake (see connection.autoAuthentication) - the same as other EcoFlow
     # devices. The EcoFlow app's "machine"/getSignatureInfo (0xA8) and cloud
