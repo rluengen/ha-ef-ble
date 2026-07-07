@@ -25,39 +25,12 @@ from bleak.backends.scanner import AdvertisementData
 from ..commands import TimeCommands
 from ..devicebase import DeviceBase
 from ..logging_util import LogOptions
-from ..model.mm100 import (
-    BbcInData,
-    BbcOutData,
-    BmsData,
-    BmsTotalData,
-    IcHighData,
-    InvData,
-    SccData,
-)
+from ..model.mm100 import BatterySummaryData
 from ..packet import Packet
-from ..props import Field
 from ..props.raw_data_field import dataclass_attr_mapper, raw_field
 from ..props.raw_data_props import RawDataProps
 
-scc = dataclass_attr_mapper(SccData)
-bbc_in = dataclass_attr_mapper(BbcInData)
-bbc_out = dataclass_attr_mapper(BbcOutData)
-inv = dataclass_attr_mapper(InvData)
-bms = dataclass_attr_mapper(BmsData)
-ic = dataclass_attr_mapper(IcHighData)
-total = dataclass_attr_mapper(BmsTotalData)
-
-# TEMP: sub-module payloads have distinct lengths, so until the (src, cmd_set, cmd_id)
-# routing is confirmed from a capture we tentatively dispatch by exact payload size.
-# (InvData/IcHighData are omitted: their real payloads are longer than the partial structs
-# currently defined, so an exact-size match would never fire for them.)
-_SIZE_TO_MODEL = {
-    SccData.SIZE: SccData,
-    BbcInData.SIZE: BbcInData,
-    BbcOutData.SIZE: BbcOutData,
-    BmsData.SIZE: BmsData,
-    BmsTotalData.SIZE: BmsTotalData,
-}
+batt = dataclass_attr_mapper(BatterySummaryData)
 
 
 class Device(DeviceBase, RawDataProps):
@@ -66,32 +39,17 @@ class Device(DeviceBase, RawDataProps):
     SN_PREFIX = (b"M3H1",)
     NAME_PREFIX = "EF-M35"
 
-    # --- System totals (BmsTotalData) ---
-    battery_level = raw_field(total.total_soc)
-    input_power = raw_field(total.total_input_watt)
-    output_power = raw_field(total.total_output_watt)
-    remaining_time = raw_field(total.total_remain_time)
+    # Confirmed from live captures: the battery summary frame (src=0x03, cmd_set=0x03,
+    # cmd_id=0x1C) byte 0 is the state of charge (%).
+    battery_level = raw_field(batt.soc)
 
-    # --- Solar / MPPT (SccData) ---
-    solar_pv1_power = raw_field(scc.pv1_in_watt)
-    solar_pv2_power = raw_field(scc.pv2_in_watt)
-    solar_input_power = Field[int]()  # computed: pv1 + pv2
-
-    # --- DC-DC input: alternator / vehicle / solar (BbcInData) ---
-    dc_input_power = raw_field(bbc_in.dc_input_watt)
-
-    # --- DC-DC output: DC loads (BbcOutData) ---
-    dc_output_power = raw_field(bbc_out.ld_out_watt)
-
-    # --- AC inverter / charger (IcHighData) ---
-    ac_input_power = raw_field(ic.in_watt)
-    ac_output_power = raw_field(ic.out_watt)
-
-    # --- Battery pack (BmsData; single instance for now) ---
-    battery_pack_soc = raw_field(bms.soc)
-    battery_pack_voltage = raw_field(bms.vol)
-    battery_pack_current = raw_field(bms.amp)
-    battery_pack_temperature = raw_field(bms.temp)
+    # TODO(capture): remaining sensors are not yet mapped to real wire offsets. The
+    # Power Kit streams per-module frames (now deobfuscated via packet_parse XOR):
+    #   0x50/0x50/0x20 = Power Hub   (serial M3H1*)  - system input/output power, etc.
+    #   0x03/0x03/0x1A = battery pack (serial M101*) - per-pack voltage/current/temp/SoC
+    #   0x02/0x02/0x04 = M1095-PSDL module
+    #   0x37/0x37/0x20 = BMS cell voltages (ten 16-bit values)
+    # Map each from differential captures (e.g. known load vs. idle) before exposing.
 
     def __init__(
         self, ble_dev: BLEDevice, adv_data: AdvertisementData, sn: str
@@ -159,24 +117,11 @@ class Device(DeviceBase, RawDataProps):
                 self._time_commands.async_send_all()
             return True
 
-        # TODO(capture): replace this TEMP size-based dispatch with explicit routing, e.g.
-        #   match (packet.src, packet.cmd_set, packet.cmd_id):
-        #       case 0x??, 0x??, 0x??:
-        #           self.update_from_bytes(SccData, packet.payload)
-        #           processed = True
-        #       case 0x??, 0x??, 0x??:
-        #           self.update_from_bytes(BmsData, packet.payload)
-        #           processed = True
-        #       ...
-        model = _SIZE_TO_MODEL.get(len(packet.payload))
-        if model is not None:
-            self.update_from_bytes(model, packet.payload)
+        # TODO(capture): route each module frame to its struct as offsets are mapped.
+        # Battery summary -> state of charge (byte 0).
+        if (packet.src, packet.cmd_set, packet.cmd_id) == (0x03, 0x03, 0x1C):
+            self.update_from_bytes(BatterySummaryData, packet.payload)
             processed = True
-
-            if model is SccData:
-                self.solar_input_power = (self.solar_pv1_power or 0) + (
-                    self.solar_pv2_power or 0
-                )
 
         for field_name in self.updated_fields:
             self.update_callback(field_name)

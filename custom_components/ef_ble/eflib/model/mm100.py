@@ -26,6 +26,20 @@ from typing import Annotated
 from .base import RawData
 
 
+class BatterySummaryData(RawData):
+    """
+    Power Kit battery summary frame (src=0x03, cmd_set=0x03, cmd_id=0x1C).
+
+    Only the state-of-charge (byte 0) is confirmed, verified against two live captures
+    (0x36 = 54% then 0x32 = 50%, matching the app). The remaining ~34 bytes (a static
+    ~0x0a64 field, a near-zero signed value that tracks pack current, etc.) are not yet
+    mapped, so this struct intentionally stops after ``soc``.
+    """
+
+    soc: Annotated[int, "B", "soc"]
+
+
+
 class SccData(RawData):
     """MPPT solar charge controller sub-module (PV1/PV2)."""
 
