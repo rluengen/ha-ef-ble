@@ -25,12 +25,12 @@ from bleak.backends.scanner import AdvertisementData
 from ..commands import TimeCommands
 from ..devicebase import DeviceBase
 from ..logging_util import LogOptions
-from ..model.mm100 import BatterySummaryData
+from ..model.mm100 import BmsTotalData
 from ..packet import Packet
 from ..props.raw_data_field import dataclass_attr_mapper, raw_field
 from ..props.raw_data_props import RawDataProps
 
-batt = dataclass_attr_mapper(BatterySummaryData)
+total = dataclass_attr_mapper(BmsTotalData)
 
 
 class Device(DeviceBase, RawDataProps):
@@ -39,17 +39,20 @@ class Device(DeviceBase, RawDataProps):
     SN_PREFIX = (b"M3H1",)
     NAME_PREFIX = "EF-M35"
 
-    # Confirmed from live captures: the battery summary frame (src=0x03, cmd_set=0x03,
-    # cmd_id=0x1C) byte 0 is the state of charge (%).
-    battery_level = raw_field(batt.soc)
+    # System totals - from the battery-summary frame (src=0x03, cmd_set=0x03,
+    # cmd_id=0x1C), which the EcoFlow app parses as BmsTotalDataBean. Verified against
+    # live captures: totalSoc (0x36->54%, 0x32->50%) and totalInputWatt (0 while idle).
+    battery_level = raw_field(total.total_soc)
+    input_power = raw_field(total.total_input_watt)
+    output_power = raw_field(total.total_output_watt)
 
-    # TODO(capture): remaining sensors are not yet mapped to real wire offsets. The
-    # Power Kit streams per-module frames (now deobfuscated via packet_parse XOR):
-    #   0x50/0x50/0x20 = Power Hub   (serial M3H1*)  - system input/output power, etc.
-    #   0x03/0x03/0x1A = battery pack (serial M101*) - per-pack voltage/current/temp/SoC
+    # TODO(capture): per-module detail is not yet mapped. The Power Kit streams
+    # (deobfuscated via packet_parse XOR):
+    #   0x50/0x50/0x20 = Power Hub    (serial M3H1*)  - hub-level metrics
+    #   0x03/0x03/0x1A = battery pack  (serial M101*, per dsrc) - V/A/temp/cells
     #   0x02/0x02/0x04 = M1095-PSDL module
     #   0x37/0x37/0x20 = BMS cell voltages (ten 16-bit values)
-    # Map each from differential captures (e.g. known load vs. idle) before exposing.
+    # Map each from the APK bean layouts + live captures before exposing them.
 
     def __init__(
         self, ble_dev: BLEDevice, adv_data: AdvertisementData, sn: str
@@ -118,9 +121,9 @@ class Device(DeviceBase, RawDataProps):
             return True
 
         # TODO(capture): route each module frame to its struct as offsets are mapped.
-        # Battery summary -> state of charge (byte 0).
+        # Battery summary (BmsTotalDataBean) -> system SoC / input W / output W.
         if (packet.src, packet.cmd_set, packet.cmd_id) == (0x03, 0x03, 0x1C):
-            self.update_from_bytes(BatterySummaryData, packet.payload)
+            self.update_from_bytes(BmsTotalData, packet.payload)
             processed = True
 
         for field_name in self.updated_fields:
