@@ -49,6 +49,11 @@ _mv_to_v = pdiv(1000, 2)
 _ma_to_a = pdiv(1000, 2)
 
 
+def _bit_state(bit: int):
+    """Return a transform reading a single circuit's on/off bit from a state bitmask."""
+    return lambda mask: bool((mask >> bit) & 1)
+
+
 class Device(DeviceBase, RawDataProps):
     """EcoFlow Power Hub (Power Kit)."""
 
@@ -103,6 +108,15 @@ class Device(DeviceBase, RawDataProps):
             getattr(dc, f"ch{_n}_current"), _ma_to_a
         )
     del _n
+
+    # DC circuit on/off states: the panel reports all 16 switchable circuits as the
+    # 16-bit chStates bitmask (bit i = circuit i+1). dc_ch_states holds the raw mask
+    # (used to rebuild the command); dc_output_channel_{n} is each circuit's bool state
+    # and backs the "DC Channel {n}" switch entities (see deprecated/switches.py).
+    dc_ch_states = raw_field(dc.ch_states)
+    for _c in range(1, 17):
+        vars()[f"dc_output_channel_{_c}"] = raw_field(dc.ch_states, _bit_state(_c - 1))
+    del _c
 
     # Each I/O sub-module frame is routed by (src, cmd_set, cmd_id) - where src, cmd_set
     # and the module bus address are equal - to its RawData struct in data_parse().
@@ -223,3 +237,26 @@ class Device(DeviceBase, RawDataProps):
             (onoff, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0xFF, 0xFF, 0xFF)
         )
         await self._send_config_packet(0x02, 0x02, 0x07, payload)
+
+    async def set_dc_circuit(self, circuit: int, enabled: bool) -> None:
+        """
+        Turn a DC distribution circuit (1-16) on/off.
+
+        The panel reports every circuit's on/off in the 16-bit ``chStates`` bitmask
+        (bit i = circuit i+1). Mirroring the app's DC toggle (MM100OutputDcViewModel.k
+        -> ud.x0.u1: dst 0x54, cmd_set 0x54, cmd_id 0x10, payload = the state bitmask),
+        we resend the full mask with just this circuit's bit updated so the other
+        circuits are preserved. The panel has 16 circuits so the mask is two
+        little-endian bytes.
+        """
+        current = self.dc_ch_states
+        if current is None:
+            return
+        bit = circuit - 1
+        if enabled:
+            new_states = current | (1 << bit)
+        else:
+            new_states = current & ~(1 << bit)
+        await self._send_config_packet(
+            0x54, 0x54, 0x10, new_states.to_bytes(2, "little")
+        )

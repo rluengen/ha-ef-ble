@@ -104,6 +104,35 @@ async def test_power_hub_dc_channels(device):
     assert not hasattr(device, "dc_output_channel_13_power")
 
 
+async def test_power_hub_dc_circuit_states(device):
+    packet = await device.packet_parse(bytes.fromhex(FRAME_DC))
+    await device.data_parse(packet)
+
+    # chStates = 0xffde -> circuits 1 and 6 off, the rest on (16 circuits).
+    assert device.dc_output_channel_1 is False
+    assert device.dc_output_channel_2 is True
+    assert device.dc_output_channel_6 is False
+    assert device.dc_output_channel_16 is True
+    assert hasattr(device, "dc_output_channel_16")
+    assert not hasattr(device, "dc_output_channel_17")
+
+
+async def test_power_hub_dc_circuit_switch_command(device):
+    packet = await device.packet_parse(bytes.fromhex(FRAME_DC))
+    await device.data_parse(packet)  # loads chStates = 0xffde
+
+    # Turning circuit 1 on flips bit 0: 0xffde -> 0xffdf, sent as 2-byte LE to the panel.
+    await device.set_dc_circuit(1, True)
+    pkt = device._conn.sendPacket.call_args[0][0]
+    assert (pkt.src, pkt.dst) == (0x21, 0x54)
+    assert (pkt.cmd_set, pkt.cmd_id) == (0x54, 0x10)
+    assert pkt.payload == bytes.fromhex("dfff")
+
+    # Turning circuit 2 off flips bit 1: 0xffde -> 0xffdc.
+    await device.set_dc_circuit(2, False)
+    assert device._conn.sendPacket.call_args[0][0].payload == bytes.fromhex("dcff")
+
+
 async def test_power_hub_field_types_numeric(device):
     for frame in (FRAME_SCC, FRAME_BBC_IN, FRAME_BBC_OUT, FRAME_IC_HIGH):
         packet = await device.packet_parse(bytes.fromhex(frame))
