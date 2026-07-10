@@ -1,3 +1,5 @@
+import struct
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -133,6 +135,37 @@ async def test_power_hub_dc_circuit_switch_command(device):
     # Circuit 2 off flips bit 1: 0xffde -> 0xffdc.
     await device.enable_dc_output_channel_2(False)
     assert device._conn.sendPacket.call_args[0][0].payload == bytes.fromhex("dcff")
+
+
+async def test_power_hub_requests_dc_names(device):
+    packet = await device.packet_parse(bytes.fromhex(FRAME_DC))
+    await device.data_parse(packet)
+
+    # Seeing the DC panel triggers a circuit-name request (empty read to 0x54/0x54/0x12).
+    reqs = [
+        c.args[0]
+        for c in device._conn.sendPacket.call_args_list
+        if c.args[0].cmd_set == 0x54 and c.args[0].cmd_id == 0x12
+    ]
+    assert reqs, "no DC name request was sent"
+    assert reqs[0].dst == 0x54
+    assert reqs[0].payload == b""
+
+
+def test_power_hub_parses_dc_names(device):
+    payload = (
+        bytes([0x00, 2])
+        + struct.pack("<I", 5)
+        + bytes([10])
+        + b"Water Pump"
+        + struct.pack("<I", 7)
+        + bytes([6])
+        + b"Driver"
+    )
+    device._parse_dc_names(payload)
+    assert device.dc_output_channel_1_name == "Water Pump"
+    assert device.dc_output_channel_2_name == "Driver"
+    assert device.dc_channel_icons == {1: 5, 2: 7}
 
 
 def test_power_hub_switch_entities_are_registered(device):

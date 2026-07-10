@@ -32,6 +32,7 @@ from ..model.mm100 import (
     SccData,
 )
 from ..packet import Packet
+from ..props import Field
 from ..props.raw_data_field import dataclass_attr_mapper, raw_field
 from ..props.raw_data_props import RawDataProps
 from ..props.transforms import pdiv
@@ -126,6 +127,8 @@ class Device(DeviceBase, RawDataProps):
     for _c in range(1, 17):
         vars()[f"dc_output_channel_{_c}"] = raw_field(dc.ch_states, _bit_state(_c - 1))
         vars()[f"enable_dc_output_channel_{_c}"] = _make_circuit_enable(_c)
+        # User-set circuit name from the panel (fetched on demand, see _request_dc_names).
+        vars()[f"dc_output_channel_{_c}_name"] = Field[str]()
     del _c
 
     # Each I/O sub-module frame is routed by (src, cmd_set, cmd_id) - where src, cmd_set
@@ -145,6 +148,11 @@ class Device(DeviceBase, RawDataProps):
         super().__init__(ble_dev, adv_data, sn)
         # Many EcoFlow devices only start streaming after the app answers a time request.
         self._time_commands = TimeCommands(device=self)
+        # Circuit names are not in the periodic telemetry - they are requested from the
+        # DC panel once it is seen. Track load state and cap the number of requests.
+        self._dc_names_loaded = False
+        self._dc_name_requests = 0
+        self.dc_channel_icons: dict[int, int] = {}
 
     @classmethod
     def check(cls, sn: bytes) -> bool:
@@ -205,6 +213,11 @@ class Device(DeviceBase, RawDataProps):
                 self._time_commands.async_send_all()
             return True
 
+        # DC distribution panel circuit names (request-driven, parser ld.f.J).
+        if (packet.src, packet.cmd_set, packet.cmd_id) == (0x54, 0x54, 0x12):
+            self._parse_dc_names(packet.payload)
+            return True
+
         # Route each mapped sub-module frame to its RawData struct.
         model = self._MODULE_FRAMES.get(
             (packet.src, packet.cmd_set, packet.cmd_id)
@@ -212,12 +225,51 @@ class Device(DeviceBase, RawDataProps):
         if model is not None:
             self.update_from_bytes(model, packet.payload)
             processed = True
+            # The panel does not stream circuit names; ask for them once it appears.
+            if (
+                model is DCData
+                and not self._dc_names_loaded
+                and self._dc_name_requests < 5
+            ):
+                self._dc_name_requests += 1
+                await self._send_config_packet(0x54, 0x54, 0x12, b"")
 
         for field_name in self.updated_fields:
             self.update_callback(field_name)
             self.update_state(field_name, getattr(self, field_name, None))
 
         return processed
+
+    def _parse_dc_names(self, payload: bytes) -> None:
+        """
+        Parse the DC panel circuit-name frame (0x54/0x54/0x12).
+
+        Layout (from the app parser ld.f.J "parseDcName"): a header byte, a circuit
+        count, then per circuit ``[chImgId (u32 LE icon), nameLen (u8), name (UTF-8)]``.
+        The Nth record maps to circuit N (1-based). Names/icons arrive after the switch
+        entities exist, so each name is pushed through the update-callback machinery to
+        rename its "DC Channel {n}" switch.
+        """
+        if len(payload) < 2:
+            return
+        count = payload[1]
+        offset = 2
+        for i in range(count):
+            if offset + 5 > len(payload):
+                break
+            img_id = int.from_bytes(payload[offset : offset + 4], "little")
+            offset += 4
+            name_len = payload[offset]
+            offset += 1
+            name = payload[offset : offset + name_len].decode("utf-8", "replace")
+            offset += name_len
+            circuit = i + 1
+            self.dc_channel_icons[circuit] = img_id
+            field_name = f"dc_output_channel_{circuit}_name"
+            setattr(self, field_name, name)
+            self.update_callback(field_name)
+            self.update_state(field_name, name)
+        self._dc_names_loaded = True
 
     async def _send_config_packet(
         self, dst: int, cmd_set: int, cmd_id: int, payload: bytes

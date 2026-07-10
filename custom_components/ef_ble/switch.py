@@ -125,6 +125,18 @@ class EcoflowSwitchEntity(EcoflowEntity, SwitchEntity):
         if entity_description.translation_key is None:
             self._attr_translation_key = self.entity_description.key
 
+        # Optional per-entity name provided by the device after creation (e.g. Power Hub
+        # DC circuit names). When such a prop exists, drop the translation key so the
+        # description name is the fallback and the device name takes over once it arrives.
+        name_prop = f"{self._prop_name}_name"
+        if hasattr(device, name_prop):
+            self._attr_translation_key = None
+            self._register_update_callback(
+                entity_attr="_attr_name",
+                prop_name=name_prop,
+                get_state=lambda name: name or self.SkipWrite,
+            )
+
         self._register_update_callback(
             entity_attr="_attr_available",
             prop_name=self._availability_prop,
