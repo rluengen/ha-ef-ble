@@ -85,6 +85,10 @@ class Device(DeviceBase, RawDataProps):
     ac_output_current = raw_field(ic_high.out_cur, _ma_to_a)
     ac_inverter_temperature = raw_field(ic_high.ac_temp)
 
+    # AC inverter on/off state (IcHigh.invSwitchState: 1 = on). Backs the "AC Output"
+    # switch entity (see deprecated/switches.py) and its enable_ac_output writer below.
+    ac_output = raw_field(ic_high.inv_switch_state, lambda x: x == 1)
+
     # Each I/O sub-module frame is routed by (src, cmd_set, cmd_id) - where src, cmd_set
     # and the module bus address are equal - to its RawData struct in data_parse().
     _MODULE_FRAMES = {
@@ -174,3 +178,32 @@ class Device(DeviceBase, RawDataProps):
             self.update_state(field_name, getattr(self, field_name, None))
 
         return processed
+
+    async def _send_config_packet(
+        self, dst: int, cmd_set: int, cmd_id: int, payload: bytes
+    ) -> None:
+        packet = Packet(
+            src=0x21,
+            dst=dst,
+            cmd_set=cmd_set,
+            cmd_id=cmd_id,
+            payload=payload,
+            version=self.packet_version,
+        )
+        await self._conn.sendPacket(packet)
+
+    async def enable_ac_output(self, enabled: bool) -> None:
+        """
+        Turn the AC inverter output on/off.
+
+        Command recovered from the EcoFlow app: the "AC Output" switch
+        (MM100OutputViewModel, analytics tag ``ac_output_switch``) dispatches to
+        ``ud.x0.h1`` which sends a 10-byte payload to the inverter module (dst 0x02,
+        cmd_set 0x02, cmd_id 0x07). Byte 0 is the on/off flag; the 0xFF bytes mark the
+        other AC settings as "leave unchanged".
+        """
+        onoff = 0x01 if enabled else 0x00
+        payload = bytes(
+            (onoff, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0xFF, 0xFF, 0xFF)
+        )
+        await self._send_config_packet(0x02, 0x02, 0x07, payload)

@@ -65,6 +65,20 @@ async def test_power_hub_ac_inverter(device):
     assert device.get_value(Device.ac_input_power) == 0
     assert device.get_value(Device.ac_output_power) == 0
     assert device.get_value(Device.ac_inverter_temperature) == 36
+    # invSwitchState=0 -> AC output reported off.
+    assert device.ac_output is False
+
+
+async def test_power_hub_ac_output_switch_sends_command(device):
+    await device.enable_ac_output(True)
+    on_packet = device._conn.sendPacket.call_args[0][0]
+    assert (on_packet.src, on_packet.dst) == (0x21, 0x02)
+    assert (on_packet.cmd_set, on_packet.cmd_id) == (0x02, 0x07)
+    assert on_packet.payload == bytes.fromhex("01ffffffffff01ffffff")
+
+    await device.enable_ac_output(False)
+    off_packet = device._conn.sendPacket.call_args[0][0]
+    assert off_packet.payload == bytes.fromhex("00ffffffffff01ffffff")
 
 
 async def test_power_hub_solar_input_present(device):

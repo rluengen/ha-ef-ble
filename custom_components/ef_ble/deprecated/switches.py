@@ -41,6 +41,11 @@ DEPRECATED_SWITCH_TYPES = [
         device_class=SwitchDeviceClass.OUTLET,
     ),
     SwitchEntityDescription(
+        key="ac_output",
+        name="AC Output",
+        device_class=SwitchDeviceClass.OUTLET,
+    ),
+    SwitchEntityDescription(
         key="disable_grid_bypass",
         name="Disable Grid Bypass",
         entity_registry_enabled_default=False,
