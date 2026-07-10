@@ -715,6 +715,20 @@ _SENSORS: Final[dict[str, SensorEntityDescription]] = {
     "dc_output_power": power(precision=2),
     "dc_output_voltage": voltage(precision=2, enabled=False),
     "dc_output_current": current(precision=2, enabled=False),
+    # Power Hub DC distribution panel: 12 low-current DC output channels
+    "dc_output_channel_{n}_power": power(
+        precision=1,
+        translation_key="dc_output_channel_power",
+        translation_placeholders={"channel": "{n}"},
+        indexed_range=range(1, 13),
+    ),
+    "dc_output_channel_{n}_current": current(
+        precision=2,
+        enabled=False,
+        translation_key="dc_output_channel_current",
+        translation_placeholders={"channel": "{n}"},
+        indexed_range=range(1, 13),
+    ),
     "dc12v_output_power": power(precision=2),
     "dc12v_output_energy": energy(),
     "usba_output_power": power(),

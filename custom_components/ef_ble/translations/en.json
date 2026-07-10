@@ -517,6 +517,12 @@
       "dc_output_power": {
         "name": "DC Output Power"
       },
+      "dc_output_channel_power": {
+        "name": "DC Channel {channel} Power"
+      },
+      "dc_output_channel_current": {
+        "name": "DC Channel {channel} Current"
+      },
       "dc12v_output_power": {
         "name": "DC 12V Output Power"
       },

@@ -27,6 +27,7 @@ from ..model.mm100 import (
     BbcInData,
     BbcOutData,
     BmsTotalData,
+    DCData,
     IcHighData,
     SccData,
 )
@@ -40,6 +41,7 @@ scc = dataclass_attr_mapper(SccData)
 bbc_in = dataclass_attr_mapper(BbcInData)
 bbc_out = dataclass_attr_mapper(BbcOutData)
 ic_high = dataclass_attr_mapper(IcHighData)
+dc = dataclass_attr_mapper(DCData)
 
 # Raw telemetry units: voltages are mV, currents mA, power whole watts. Scale to
 # V/A for the corresponding Home Assistant device classes; watts are used as-is.
@@ -89,6 +91,19 @@ class Device(DeviceBase, RawDataProps):
     # switch entity (see deprecated/switches.py) and its enable_ac_output writer below.
     ac_output = raw_field(ic_high.inv_switch_state, lambda x: x == 1)
 
+    # -- DC distribution panel (DCData, frame 0x54/0x54/0x20): 12 low-current DC output
+    #    channels. Expose per-channel power (W) and current (mA->A). Attributes are
+    #    generated dynamically as dc_output_channel_{n}_power/_current for n in 1..12,
+    #    matching the indexed sensor keys in sensor.py.
+    for _n in range(1, 13):
+        vars()[f"dc_output_channel_{_n}_power"] = raw_field(
+            getattr(dc, f"ch{_n}_power")
+        )
+        vars()[f"dc_output_channel_{_n}_current"] = raw_field(
+            getattr(dc, f"ch{_n}_current"), _ma_to_a
+        )
+    del _n
+
     # Each I/O sub-module frame is routed by (src, cmd_set, cmd_id) - where src, cmd_set
     # and the module bus address are equal - to its RawData struct in data_parse().
     _MODULE_FRAMES = {
@@ -97,6 +112,7 @@ class Device(DeviceBase, RawDataProps):
         (0x50, 0x50, 0x20): BbcInData,
         (0x51, 0x51, 0x20): BbcOutData,
         (0x04, 0x04, 0x06): IcHighData,
+        (0x54, 0x54, 0x20): DCData,
     }
 
     def __init__(

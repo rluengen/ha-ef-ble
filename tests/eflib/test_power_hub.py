@@ -9,6 +9,7 @@ FRAME_SCC = "aa038800c02c74b48300043e0521010005203945444d42593924242059464235464
 FRAME_BBC_IN = "aa037400282c98a1a900023e502101005020d5abd0a9dba8a9aba0dfa0afa8a9abab88bf98989299999de7fe9898749c9898b9989898a1569898a0999898889898983e98989821989898bb98bc98be989998d80498984a9c98988d9b9898999f999a9999c09a98989898989898989898e39899989898989a98989898989898989898989898986f9e"
 FRAME_BBC_OUT = "aa037400282cf6d14500033e512101005120bbc5bec7c3c6c7c4ceb1cec7c6c2c7c56eccf6f69ef6f7f36d3bf6f691f1f6f695f6f6f6dec3f6f61ee4f6f6b7f6f6f6eceef6f61bf4f6f6c5f6f6f6f6f6f4f7f6f6f6f6c1c6f6f67dc7f7f6f6f6f6f6f6f6f7f1f3f6f6f6f6f6f6f6f6f6fcf6f7f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6cb75"
 FRAME_IC_HIGH = "aa036300142cf21d2001063e042101000406bfc3c2cbc7dfa2a1b6badfc1c6c4cbc1f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2d6f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f28acefdf3f3f2fdf2f2f2f2f2f2f2f2f2f202f2f3f2f3f3c0f2f2f2f2f2f2f2f2f2f2f2f2f2f2cc02"
+FRAME_DC = "aa03d7000f0c00000000083e5421110154204d334c315a4142345a473752303239380000000000000000000000003d3500000000000000000000000000000000000000000000000000000000000000000000000000000302000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000024002200dedeff0000409c689c909cb89ce09c089d309d589d809da89dd09df89d609f0000000000000000000000000000000000000000000000000000000000000000209e489e709e989edeff0000010000005416"
 
 
 @pytest.fixture
@@ -87,6 +88,20 @@ async def test_power_hub_solar_input_present(device):
 
     assert Device.solar_input_power.public_name in device.updated_fields
     assert isinstance(device.get_value(Device.solar_input_power), (int, float))
+
+
+async def test_power_hub_dc_channels(device):
+    packet = await device.packet_parse(bytes.fromhex(FRAME_DC))
+    assert (packet.src, packet.cmd_set, packet.cmd_id) == (0x54, 0x54, 0x20)
+    assert await device.data_parse(packet) is True
+
+    # 12 low-current DC channels; channel 10 active at 7 W / 515 mA, rest idle.
+    assert device.dc_output_channel_10_power == 7
+    assert device.dc_output_channel_10_current == pytest.approx(0.52, abs=0.01)
+    assert device.dc_output_channel_1_power == 0
+    assert device.dc_output_channel_12_power == 0
+    assert hasattr(device, "dc_output_channel_12_power")
+    assert not hasattr(device, "dc_output_channel_13_power")
 
 
 async def test_power_hub_field_types_numeric(device):

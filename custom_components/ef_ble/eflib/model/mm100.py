@@ -188,6 +188,53 @@ class IcHighData(RawData):
     day_output_energy: Annotated[int, "I", "dayOutputEnergy"]
 
 
+class DCData(RawData):
+    """
+    DC distribution panel (M3L1 smart panel). Frame 0x54/0x54/0x20, dsrc 0x11.
+
+    Twelve low-current DC output channels, each with a current and power reading and an
+    on/off state bit (bits 0-11 of ``ch_states``). ``relay_state`` holds the panel's six
+    relay (high-current / non-switched) circuit bits. Validated against live frames:
+    input_vol ~13.6 V, per-channel power in whole watts, current in mA. errorCode and
+    sysVer are kept as raw byte blocks (int[8]/int[4] in the app) purely to hold offsets.
+    """
+
+    sn: Annotated[bytes, "16s", "sn"]
+    error_code: Annotated[bytes, "8s", "errorCode"]
+    sys_ver: Annotated[bytes, "4s", "sysVer"]
+    input_vol: Annotated[int, "I", "inputVol"]
+    ch1_current: Annotated[int, "i", "channelCur1"]
+    ch2_current: Annotated[int, "i", "channelCur2"]
+    ch3_current: Annotated[int, "i", "channelCur3"]
+    ch4_current: Annotated[int, "i", "channelCur4"]
+    ch5_current: Annotated[int, "i", "channelCur5"]
+    ch6_current: Annotated[int, "i", "channelCur6"]
+    ch7_current: Annotated[int, "i", "channelCur7"]
+    ch8_current: Annotated[int, "i", "channelCur8"]
+    ch9_current: Annotated[int, "i", "channelCur9"]
+    ch10_current: Annotated[int, "i", "channelCur10"]
+    ch11_current: Annotated[int, "i", "channelCur11"]
+    ch12_current: Annotated[int, "i", "channelCur12"]
+    ch1_power: Annotated[int, "i", "chPower1"]
+    ch2_power: Annotated[int, "i", "chPower2"]
+    ch3_power: Annotated[int, "i", "chPower3"]
+    ch4_power: Annotated[int, "i", "chPower4"]
+    ch5_power: Annotated[int, "i", "chPower5"]
+    ch6_power: Annotated[int, "i", "chPower6"]
+    ch7_power: Annotated[int, "i", "chPower7"]
+    ch8_power: Annotated[int, "i", "chPower8"]
+    ch9_power: Annotated[int, "i", "chPower9"]
+    ch10_power: Annotated[int, "i", "chPower10"]
+    ch11_power: Annotated[int, "i", "chPower11"]
+    ch12_power: Annotated[int, "i", "chPower12"]
+    total_power: Annotated[int, "i", "totalPower"]
+    temp0: Annotated[int, "h", "temp0"]
+    temp1: Annotated[int, "h", "temp1"]
+    relay_state: Annotated[int, "B", "relayState"]
+    ch_states: Annotated[int, "H", "chStates"]
+    ch_enable_states: Annotated[int, "H", "chEnableStates"]
+
+
 class BmsData(RawData):
     """Battery management system (per-pack). Frame 0x03/0x03/0x1A."""
 
