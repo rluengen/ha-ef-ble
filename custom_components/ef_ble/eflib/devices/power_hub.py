@@ -54,6 +54,15 @@ def _bit_state(bit: int):
     return lambda mask: bool((mask >> bit) & 1)
 
 
+def _make_circuit_enable(circuit: int):
+    """Return an ``enable_dc_output_channel_{n}`` coroutine bound to a circuit index."""
+
+    async def _enable(self: "Device", enabled: bool) -> None:
+        await self.set_dc_circuit(circuit, enabled)
+
+    return _enable
+
+
 class Device(DeviceBase, RawDataProps):
     """EcoFlow Power Hub (Power Kit)."""
 
@@ -116,6 +125,7 @@ class Device(DeviceBase, RawDataProps):
     dc_ch_states = raw_field(dc.ch_states)
     for _c in range(1, 17):
         vars()[f"dc_output_channel_{_c}"] = raw_field(dc.ch_states, _bit_state(_c - 1))
+        vars()[f"enable_dc_output_channel_{_c}"] = _make_circuit_enable(_c)
     del _c
 
     # Each I/O sub-module frame is routed by (src, cmd_set, cmd_id) - where src, cmd_set

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntityDescription
 
 from ..eflib import DeviceBase
-from ..eflib.devices import dpu, power_hub, shp2
+from ..eflib.devices import dpu, shp2
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -45,13 +45,13 @@ DEPRECATED_SWITCH_TYPES = [
         name="AC Output",
         device_class=SwitchDeviceClass.OUTLET,
     ),
-    # Power Hub DC distribution panel: 16 individually-switchable circuits
+    # Power Hub DC distribution panel: 16 individually-switchable circuits. State comes
+    # from device.dc_output_channel_{n} and turn on/off from device.enable_dc_output_channel_{n}.
     *[
-        EcoflowSwitchEntityDescription[power_hub.Device](
+        SwitchEntityDescription(
             key=f"dc_output_channel_{n}",
             name=f"DC Channel {n}",
             device_class=SwitchDeviceClass.OUTLET,
-            set_state=lambda device, value, n=n: device.set_dc_circuit(n, value),
         )
         for n in range(1, 17)
     ],

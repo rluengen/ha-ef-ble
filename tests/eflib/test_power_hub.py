@@ -1,6 +1,7 @@
 import pytest
 from pytest_mock import MockerFixture
 
+from custom_components.ef_ble.deprecated.switches import DEPRECATED_SWITCH_TYPES
 from custom_components.ef_ble.eflib.devices.power_hub import Device
 
 # Raw decrypted BLE frames (payloads still XOR-obfuscated) captured from a live Power Hub;
@@ -121,16 +122,28 @@ async def test_power_hub_dc_circuit_switch_command(device):
     packet = await device.packet_parse(bytes.fromhex(FRAME_DC))
     await device.data_parse(packet)  # loads chStates = 0xffde
 
-    # Turning circuit 1 on flips bit 0: 0xffde -> 0xffdf, sent as 2-byte LE to the panel.
-    await device.set_dc_circuit(1, True)
+    # The switch entity turns circuits on/off via enable_dc_output_channel_{n}.
+    # Circuit 1 on flips bit 0: 0xffde -> 0xffdf, sent as 2-byte LE to the panel.
+    await device.enable_dc_output_channel_1(True)
     pkt = device._conn.sendPacket.call_args[0][0]
     assert (pkt.src, pkt.dst) == (0x21, 0x54)
     assert (pkt.cmd_set, pkt.cmd_id) == (0x54, 0x10)
     assert pkt.payload == bytes.fromhex("dfff")
 
-    # Turning circuit 2 off flips bit 1: 0xffde -> 0xffdc.
-    await device.set_dc_circuit(2, False)
+    # Circuit 2 off flips bit 1: 0xffde -> 0xffdc.
+    await device.enable_dc_output_channel_2(False)
     assert device._conn.sendPacket.call_args[0][0].payload == bytes.fromhex("dcff")
+
+
+def test_power_hub_switch_entities_are_registered(device):
+    # Guard against the switch platform silently dropping the Power Hub switches: every
+    # deprecated switch key for this device must be backed by both a state property and
+    # an enable_{key} writer (the path the deprecated switch platform uses).
+    keys = {d.key for d in DEPRECATED_SWITCH_TYPES}
+    for key in ["ac_output", *[f"dc_output_channel_{n}" for n in range(1, 17)]]:
+        assert key in keys, f"{key} missing from DEPRECATED_SWITCH_TYPES"
+        assert hasattr(device, key), f"{key} state property missing"
+        assert hasattr(device, f"enable_{key}"), f"enable_{key} writer missing"
 
 
 async def test_power_hub_field_types_numeric(device):
