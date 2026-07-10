@@ -1,22 +1,20 @@
 """
-EcoFlow Power Hub (MM100 / "Power Kit") device - WORK IN PROGRESS / SKELETON.
+EcoFlow Power Hub (MM100 / "Power Kit").
 
 The Power Hub speaks the standard EcoFlow BLE framing (handled by ``Packet``) but, unlike
 the protobuf devices, reports each internal sub-module as a packed fixed-width binary
-payload. The struct layouts live in ``..model.mm100`` and were recovered from the EcoFlow
-Android app parser; see that module for caveats.
+payload. The struct layouts live in ``..model.mm100`` and were recovered from - and
+validated against - the EcoFlow Android app packet parser plus ~15k live decrypted frames.
 
-STATUS - this is a scaffold to be finalised against a live decrypted capture:
-  * ``data_parse`` currently logs every frame and routes sub-module payloads by their
-    (distinct) byte length as a TEMPORARY heuristic. The real routing is by
-    ``(src, cmd_set, cmd_id)`` and must be filled in from a capture (see the ``match``
-    template in ``data_parse``).
-  * Sensor values are raw (un-scaled). Real units/scaling (mV/mA -> V/A, etc.) need to be
-    confirmed from the capture and applied via ``transform`` (e.g. ``pround``/``pdiv``).
-  * Only a representative subset of fields is surfaced; multiple SCC/BBC/BMS instances are
-    addressed by ``dsrc`` and need per-address handling (not yet implemented).
-  * No write/command support yet (``cmd_set``/``cmd_id`` unknown until capture).
-  * Entity descriptions (sensor.py registration, translations, icons) are a follow-up.
+Auth is the standard local ``md5(numeric userId + sn)`` handshake; telemetry payloads are
+XOR-obfuscated with ``seq[0]`` (undone in :meth:`packet_parse`). Each sub-module frame is
+routed by ``(src, cmd_set, cmd_id)`` in :meth:`data_parse` to its ``RawData`` struct.
+
+Currently surfaced: system SoC / input / output power, plus per-module solar, DC input,
+DC output and AC inverter power/voltage/current and battery bus voltage/current.
+
+Still to do: AC-inverter on/off write control; per-pack BMS detail (multiple ``M101*``
+packs addressed by ``dsrc``); AC/DC distribution-panel per-circuit arrays; generator.
 """
 
 from bleak.backends.device import BLEDevice
@@ -25,12 +23,28 @@ from bleak.backends.scanner import AdvertisementData
 from ..commands import TimeCommands
 from ..devicebase import DeviceBase
 from ..logging_util import LogOptions
-from ..model.mm100 import BmsTotalData
+from ..model.mm100 import (
+    BbcInData,
+    BbcOutData,
+    BmsTotalData,
+    IcHighData,
+    SccData,
+)
 from ..packet import Packet
 from ..props.raw_data_field import dataclass_attr_mapper, raw_field
 from ..props.raw_data_props import RawDataProps
+from ..props.transforms import pdiv
 
 total = dataclass_attr_mapper(BmsTotalData)
+scc = dataclass_attr_mapper(SccData)
+bbc_in = dataclass_attr_mapper(BbcInData)
+bbc_out = dataclass_attr_mapper(BbcOutData)
+ic_high = dataclass_attr_mapper(IcHighData)
+
+# Raw telemetry units: voltages are mV, currents mA, power whole watts. Scale to
+# V/A for the corresponding Home Assistant device classes; watts are used as-is.
+_mv_to_v = pdiv(1000, 2)
+_ma_to_a = pdiv(1000, 2)
 
 
 class Device(DeviceBase, RawDataProps):
@@ -39,20 +53,47 @@ class Device(DeviceBase, RawDataProps):
     SN_PREFIX = (b"M3H1",)
     NAME_PREFIX = "EF-M35"
 
-    # System totals - from the battery-summary frame (src=0x03, cmd_set=0x03,
-    # cmd_id=0x1C), which the EcoFlow app parses as BmsTotalDataBean. Verified against
-    # live captures: totalSoc (0x36->54%, 0x32->50%) and totalInputWatt (0 while idle).
+    # -- System totals (BmsTotalData, frame 0x03/0x03/0x1C). Verified against live
+    #    captures: totalSoc (0x36->54%, 0x32->50%) and totalInputWatt (0 while idle).
     battery_level = raw_field(total.total_soc)
     input_power = raw_field(total.total_input_watt)
     output_power = raw_field(total.total_output_watt)
 
-    # TODO(capture): per-module detail is not yet mapped. The Power Kit streams
-    # (deobfuscated via packet_parse XOR):
-    #   0x50/0x50/0x20 = Power Hub    (serial M3H1*)  - hub-level metrics
-    #   0x03/0x03/0x1A = battery pack  (serial M101*, per dsrc) - V/A/temp/cells
-    #   0x02/0x02/0x04 = M1095-PSDL module
-    #   0x37/0x37/0x20 = BMS cell voltages (ten 16-bit values)
-    # Map each from the APK bean layouts + live captures before exposing them.
+    # -- Solar MPPT input (SccData, frame 0x05/0x05/0x20). PV1/PV2 charge power.
+    solar_input_power = raw_field(scc.pv1_in_watt)
+    solar_input_power_2 = raw_field(scc.pv2_in_watt)
+
+    # -- DC / alternator input (BbcInData, frame 0x50/0x50/0x20) - the hub module.
+    #    Also the source for the shared 48V battery bus voltage/current.
+    dc_input_power = raw_field(bbc_in.dc_input_watt)
+    dc_input_voltage = raw_field(bbc_in.dc_input_vol, _mv_to_v)
+    dc_input_current = raw_field(bbc_in.dc_input_cur, _ma_to_a)
+    battery_voltage = raw_field(bbc_in.battery_vol, _mv_to_v)
+    battery_current = raw_field(bbc_in.battery_cur, _ma_to_a)
+
+    # -- DC output / loads (BbcOutData, frame 0x51/0x51/0x20).
+    dc_output_power = raw_field(bbc_out.ld_out_watt)
+    dc_output_voltage = raw_field(bbc_out.ld_out_vol, _mv_to_v)
+    dc_output_current = raw_field(bbc_out.ld_out_cur, _ma_to_a)
+
+    # -- AC inverter/charger (IcHighData, frame 0x04/0x04/0x06). in_* = AC charging,
+    #    out_* = AC inverter output; inv_switch_state is the AC inverter on/off state.
+    ac_input_power = raw_field(ic_high.in_watt)
+    ac_input_voltage = raw_field(ic_high.in_vol, _mv_to_v)
+    ac_output_power = raw_field(ic_high.out_watt)
+    ac_output_voltage = raw_field(ic_high.out_vol, _mv_to_v)
+    ac_output_current = raw_field(ic_high.out_cur, _ma_to_a)
+    ac_inverter_temperature = raw_field(ic_high.ac_temp)
+
+    # Each I/O sub-module frame is routed by (src, cmd_set, cmd_id) - where src, cmd_set
+    # and the module bus address are equal - to its RawData struct in data_parse().
+    _MODULE_FRAMES = {
+        (0x03, 0x03, 0x1C): BmsTotalData,
+        (0x05, 0x05, 0x20): SccData,
+        (0x50, 0x50, 0x20): BbcInData,
+        (0x51, 0x51, 0x20): BbcOutData,
+        (0x04, 0x04, 0x06): IcHighData,
+    }
 
     def __init__(
         self, ble_dev: BLEDevice, adv_data: AdvertisementData, sn: str
@@ -120,10 +161,12 @@ class Device(DeviceBase, RawDataProps):
                 self._time_commands.async_send_all()
             return True
 
-        # TODO(capture): route each module frame to its struct as offsets are mapped.
-        # Battery summary (BmsTotalDataBean) -> system SoC / input W / output W.
-        if (packet.src, packet.cmd_set, packet.cmd_id) == (0x03, 0x03, 0x1C):
-            self.update_from_bytes(BmsTotalData, packet.payload)
+        # Route each mapped sub-module frame to its RawData struct.
+        model = self._MODULE_FRAMES.get(
+            (packet.src, packet.cmd_set, packet.cmd_id)
+        )
+        if model is not None:
+            self.update_from_bytes(model, packet.payload)
             processed = True
 
         for field_name in self.updated_fields:

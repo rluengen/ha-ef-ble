@@ -4,21 +4,22 @@ EcoFlow Power Hub (MM100) BLE telemetry structs.
 The Power Hub ("Power Kit" central unit, serial ``M3H1*`` / BLE name ``EF-M35*``) reports
 each internal sub-module (solar MPPT, DC-DC converters, inverter, BMS, AC/DC distribution,
 generator) as a packed fixed-width binary payload. Field order and widths below are the
-BLE wire layout, recovered from the EcoFlow Android app packet parser (setter-call order
-in obfuscated class ``ld.f``, app 5.4.5). Each field follows the same
+BLE wire layout, recovered from - and verified byte-for-byte against - the EcoFlow Android
+app packet parser (obfuscated class ``ld.f`` in ``classes14.dex``, app 5.4.5) and validated
+against ~15k live decrypted frames. Each field follows the same
 ``Annotated[<pytype>, <struct_fmt>, <originalCamelCaseName>]`` convention as the other
 ``RawData`` models in this package.
 
-PROVISIONAL - verify against a live decrypted capture before relying on values:
-  * ``int`` fields are treated as unsigned (``I``); some currents may be signed (``i``).
-  * 16-bit ``h`` fields are temperatures (signed) and small flags.
-  * byte temperatures (``B``) may actually be signed/offset.
-  * The leading payload may contain a header before field 0 (no preamble assumed here).
-
-DEFERRED until capture (per-channel arrays / generator pack of runtime length):
-  * ACData / DCData distribution panels: errorCode[], channelCur[], chPower[],
-    chStates[], chEnableStates[] (length == channel count).
-  * OilPackData (smart generator): hwVer[], errorCode[], systemVer[] arrays.
+Wire layout notes (confirmed against the parser bytecode + captures):
+  * Serial-prefixed sub-module frames start with a 16-byte ASCII ``sn`` then, for most
+    modules, a 4-byte ``errCode``/``pv*ErrorCode`` and a 4-byte ``sysVer`` (packed as an
+    ``int[4]`` firmware version in the app; we keep it as a single ``I``).
+  * ``batteryCur``/``*Watt``/``*Cur`` are signed (``i``/``h``) - a negative value is
+    discharge/reverse flow (verified: batteryCur read back as -16 while idle).
+  * Heat-sink/PCB temperatures are signed 16-bit (``h``), in whole degrees C.
+  * Voltages are milli-volts, currents milli-amps, power whole watts, energy watt-hours.
+    (verified e.g. BbcOut ldOutVol=13555 -> 13.5 V, ldOutCur=671..4840 mA,
+    ldOutWatt=9..65 W all self-consistent; Scc batteryVol=53081 -> 53.1 V.)
 """
 
 from typing import Annotated
@@ -27,65 +28,70 @@ from .base import RawData
 
 
 class SccData(RawData):
-    """MPPT solar charge controller sub-module (PV1/PV2)."""
+    """MPPT solar charge controller sub-module (PV1/PV2). Frame 0x05/0x05/0x20."""
 
+    sn: Annotated[bytes, "16s", "sn"]
     pv1_error_code: Annotated[int, "I", "pv1ErrorCode"]
     pv2_error_code: Annotated[int, "I", "pv2ErrorCode"]
+    sys_ver: Annotated[int, "I", "sysVer"]
     battery_vol: Annotated[int, "I", "batteryVol"]
-    battery_cur: Annotated[int, "I", "batteryCur"]
-    battery_watt: Annotated[int, "I", "batteryWatt"]
+    battery_cur: Annotated[int, "i", "batteryCur"]
+    battery_watt: Annotated[int, "i", "batteryWatt"]
     pv1_in_vol: Annotated[int, "I", "pv1InVol"]
-    pv1_in_cur: Annotated[int, "I", "pv1InCur"]
-    pv1_in_watt: Annotated[int, "I", "pv1InWatt"]
+    pv1_in_cur: Annotated[int, "i", "pv1InCur"]
+    pv1_in_watt: Annotated[int, "i", "pv1InWatt"]
     pv2_in_vol: Annotated[int, "I", "pv2InVol"]
-    pv2_in_cur: Annotated[int, "I", "pv2InCur"]
-    pv2_in_watt: Annotated[int, "I", "pv2InWatt"]
-    l1_cur: Annotated[int, "I", "l1Cur"]
-    l2_cur: Annotated[int, "I", "l2Cur"]
+    pv2_in_cur: Annotated[int, "i", "pv2InCur"]
+    pv2_in_watt: Annotated[int, "i", "pv2InWatt"]
+    l1_cur: Annotated[int, "i", "l1Cur"]
+    l2_cur: Annotated[int, "i", "l2Cur"]
     hs1_temp: Annotated[int, "h", "hs1Temp"]
     hs2_temp: Annotated[int, "h", "hs2Temp"]
     pcb_temp: Annotated[int, "h", "pcbTemp"]
-    pv1_work_mode: Annotated[int, "h", "pv1WorkMode"]
-    pv2_work_mode: Annotated[int, "h", "pv2WorkMode"]
-    mppt1_switch_state: Annotated[int, "h", "mppt1SwitchState"]
-    mppt2_switch_state: Annotated[int, "h", "mppt2SwitchState"]
-    pv1_input_flag: Annotated[int, "h", "pv1InputFlag"]
-    pv2_input_flag: Annotated[int, "h", "pv2InputFlag"]
+    pv1_work_mode: Annotated[int, "B", "pv1WorkMode"]
+    pv2_work_mode: Annotated[int, "B", "pv2WorkMode"]
+    mppt1_switch_state: Annotated[int, "B", "mppt1SwitchState"]
+    mppt2_switch_state: Annotated[int, "B", "mppt2SwitchState"]
+    pv1_input_flag: Annotated[int, "B", "pv1InputFlag"]
+    pv2_input_flag: Annotated[int, "B", "pv2InputFlag"]
     day_energy: Annotated[int, "I", "dayEnergy"]
     total_energy: Annotated[int, "I", "totalEnergy"]
     pv1_cable_length: Annotated[int, "I", "pv1CableLength"]
     pv2_cable_length: Annotated[int, "I", "pv2CableLength"]
     pv1_len_unit_flag: Annotated[int, "B", "pv1LenUnitFlag"]
     pv2_len_unit_flag: Annotated[int, "B", "pv2LenUnitFlag"]
-    pv1_hot_out: Annotated[int, "I", "pv1HotOut"]
-    pv2_hot_out: Annotated[int, "I", "pv2HotOut"]
-    warn_code1: Annotated[int, "I", "warnCode1"]
-    event_code1: Annotated[int, "I", "eventCode1"]
-    warn_code2: Annotated[int, "I", "warnCode2"]
-    event_code2: Annotated[int, "I", "eventCode2"]
-    pv1_vol_limit: Annotated[int, "I", "pv1VolLimit"]
-    pv2_vol_limit: Annotated[int, "I", "pv2VolLimit"]
+    pv1_hot_out: Annotated[int, "B", "pv1HotOut"]
+    pv2_hot_out: Annotated[int, "B", "pv2HotOut"]
+    warn_code1: Annotated[int, "H", "warnCode1"]
+    event_code1: Annotated[int, "H", "eventCode1"]
+    warn_code2: Annotated[int, "H", "warnCode2"]
+    event_code2: Annotated[int, "H", "eventCode2"]
+    pv1_vol_limit: Annotated[int, "H", "pv1VolLimit"]
+    pv2_vol_limit: Annotated[int, "H", "pv2VolLimit"]
     pv1_vol_limit_enable: Annotated[int, "B", "pv1VolLimitEnable"]
     pv2_vol_limit_enable: Annotated[int, "B", "pv2VolLimitEnable"]
 
 
 class BbcInData(RawData):
-    """BBC DC-DC input: solar / alternator / vehicle DC charging."""
+    """BBC DC-DC input: solar / alternator / vehicle DC charging. Frame 0x50/0x50/0x20."""
 
+    sn: Annotated[bytes, "16s", "sn"]
+    err_code: Annotated[int, "I", "errCode"]
+    sys_ver: Annotated[int, "I", "sysVer"]
     dc_input_vol: Annotated[int, "I", "dcInputVol"]
-    dc_input_cur: Annotated[int, "I", "dcInputCur"]
-    dc_input_watt: Annotated[int, "I", "dcInputWatt"]
+    dc_input_cur: Annotated[int, "i", "dcInputCur"]
+    dc_input_watt: Annotated[int, "i", "dcInputWatt"]
     battery_vol: Annotated[int, "I", "batteryVol"]
-    battery_cur: Annotated[int, "I", "batteryCur"]
-    battery_watt: Annotated[int, "I", "batteryWatt"]
-    l1_cur: Annotated[int, "I", "l1Cur"]
-    l2_cur: Annotated[int, "I", "l2Cur"]
+    battery_cur: Annotated[int, "i", "batteryCur"]
+    battery_watt: Annotated[int, "i", "batteryWatt"]
+    l1_cur: Annotated[int, "i", "l1Cur"]
+    l2_cur: Annotated[int, "i", "l2Cur"]
     hs1_temp: Annotated[int, "h", "hs1Temp"]
     hs2_temp: Annotated[int, "h", "hs2Temp"]
     pcb_temp: Annotated[int, "h", "pcbTemp"]
     work_mode: Annotated[int, "B", "workMode"]
     charge_pause: Annotated[int, "B", "chargePause"]
-    max_config_charge_cur: Annotated[int, "I", "maxConfigChargeCur"]
+    max_config_charge_cur: Annotated[int, "i", "maxConfigChargeCur"]
     day_energy: Annotated[int, "I", "dayEnergy"]
     total_energy: Annotated[int, "I", "totalEnergy"]
     dc_input_state: Annotated[int, "B", "dcInputState"]
@@ -97,26 +103,29 @@ class BbcInData(RawData):
     alt_cable_length: Annotated[int, "I", "altCableLength"]
     length_unit_flag: Annotated[int, "B", "lengthUnitFlag"]
     charge_mode: Annotated[int, "B", "chargeMode"]
-    warn_code: Annotated[int, "I", "warnCode"]
-    event_code: Annotated[int, "I", "eventCode"]
+    warn_code: Annotated[int, "H", "warnCode"]
+    event_code: Annotated[int, "H", "eventCode"]
     work_mode2: Annotated[int, "B", "workMode2"]
     allow_dsg_on: Annotated[int, "B", "allowDsgOn"]
-    alt_limit_vol: Annotated[int, "I", "altLimitVol"]
+    alt_limit_vol: Annotated[int, "H", "altLimitVol"]
     alt_vol_limit_enable: Annotated[int, "B", "altVolLimitEnable"]
-    third_watts: Annotated[int, "I", "thirdWatts"]
+    third_watts: Annotated[int, "i", "thirdWatts"]
 
 
 class BbcOutData(RawData):
-    """BBC DC-DC output: DC loads."""
+    """BBC DC-DC output: DC loads. Frame 0x51/0x51/0x20."""
 
+    sn: Annotated[bytes, "16s", "sn"]
+    err_code: Annotated[int, "I", "errCode"]
+    sys_ver: Annotated[int, "I", "sysVer"]
     battery_vol: Annotated[int, "I", "batteryVol"]
-    battery_cur: Annotated[int, "I", "batteryCur"]
-    battery_watt: Annotated[int, "I", "batteryWatt"]
+    battery_cur: Annotated[int, "i", "batteryCur"]
+    battery_watt: Annotated[int, "i", "batteryWatt"]
     ld_out_vol: Annotated[int, "I", "ldOutVol"]
-    ld_out_cur: Annotated[int, "I", "ldOutCur"]
-    ld_out_watt: Annotated[int, "I", "ldOutWatt"]
-    l1_cur: Annotated[int, "I", "l1Cur"]
-    l2_cur: Annotated[int, "I", "l2Cur"]
+    ld_out_cur: Annotated[int, "i", "ldOutCur"]
+    ld_out_watt: Annotated[int, "i", "ldOutWatt"]
+    l1_cur: Annotated[int, "i", "l1Cur"]
+    l2_cur: Annotated[int, "i", "l2Cur"]
     hs1_temp: Annotated[int, "h", "hs1Temp"]
     hs2_temp: Annotated[int, "h", "hs2Temp"]
     pcb_temp: Annotated[int, "h", "pcbTemp"]
@@ -125,40 +134,62 @@ class BbcOutData(RawData):
     dc_output_vol_tag: Annotated[int, "B", "dcOutputVolTag"]
     day_energy: Annotated[int, "I", "dayEnergy"]
     total_energy: Annotated[int, "I", "totalEnergy"]
-    warn_code: Annotated[int, "I", "warnCode"]
-    event_code: Annotated[int, "I", "eventCode"]
-    standby_time: Annotated[int, "I", "standbyTime"]
+    warn_code: Annotated[int, "H", "warnCode"]
+    event_code: Annotated[int, "H", "eventCode"]
+    standby_time: Annotated[int, "H", "standbyTime"]
 
 
 class InvData(RawData):
-    """Inverter sub-module."""
+    """
+    Low-voltage inverter/charger sub-module (M1095-PSDL). Frame 0x02/0x02/0x04.
 
-    warn_code: Annotated[int, "I", "warnCode"]
-    event_code: Annotated[int, "I", "eventCode"]
+    NOTE: field offsets past ``sys_ver`` are taken from the app parser but have not been
+    cross-validated against a live capture with the LV inverter active, so no sensors are
+    wired from this struct yet (the HV AC inverter is ``IcHighData``).
+    """
+
+    sn: Annotated[bytes, "16s", "sn"]
+    err_code: Annotated[int, "I", "errCode"]
+    sys_ver: Annotated[int, "I", "sysVer"]
+    warn_code: Annotated[int, "H", "warnCode"]
+    event_code: Annotated[int, "H", "eventCode"]
     battery_vol: Annotated[int, "I", "batteryVol"]
-    battery_cur: Annotated[int, "I", "batteryCur"]
+    battery_cur: Annotated[int, "i", "batteryCur"]
     bus_vol: Annotated[int, "I", "busVol"]
     dc_temp: Annotated[int, "h", "dcTemp"]
     fan_level: Annotated[int, "B", "fanLevel"]
     charger_type: Annotated[int, "B", "chargerType"]
-    charge_discharge_state: Annotated[int, "B", "chargeDischargeState"]
 
-    # TODO(capture): the following trailing fields are interrupted by a
-    # variable-length array / nested struct and need a live capture to
-    # confirm size/offset before they can be added:
-    #   protect_state  (orig protectState, array/nested/string)
-    #   max_charge_cur  (orig maxChargeCur, I)
-    #   bms_charge_cur  (orig bmsChargeCur, I)
-    #   battery_charge_vol  (orig batteryChargeVol, I)
-    #   charge_flag  (orig chargeFlag, B)
-    #   real_soc  (orig realSoc, B)
-    #   charge_in_type  (orig chargeInType, B)
-    #   ext_kit_type  (orig extKitType, B)
-    #   low_power_flag  (orig lowPowerFlag, B)
+
+class IcHighData(RawData):
+    """
+    High-voltage AC inverter/charger (IC, M1095-PSDH). Frame 0x04/0x04/0x06.
+
+    This is the module that produces/consumes household AC; ``inv_switch_state`` is the
+    AC inverter on/off state. Fields past ``day_output_energy`` sit behind a
+    variable-length nested config block (``appToICCfg``) and are intentionally omitted.
+    """
+
+    sn: Annotated[bytes, "16s", "sn"]
+    in_vol: Annotated[int, "I", "inVol"]
+    in_cur: Annotated[int, "i", "inCur"]
+    in_watt: Annotated[int, "i", "inWatt"]
+    out_vol: Annotated[int, "I", "outVol"]
+    out_cur: Annotated[int, "i", "outCur"]
+    out_watt: Annotated[int, "i", "outWatt"]
+    out_va: Annotated[int, "I", "outVa"]
+    ac_temp: Annotated[int, "h", "acTemp"]
+    inv_type: Annotated[int, "B", "invType"]
+    in_freq: Annotated[int, "B", "inFreq"]
+    out_freq: Annotated[int, "B", "outFreq"]
+    inv_switch_state: Annotated[int, "B", "invSwitchState"]
+    cfg_out_freq: Annotated[int, "B", "cfgOutFreq"]
+    day_input_energy: Annotated[int, "I", "dayInputEnergy"]
+    day_output_energy: Annotated[int, "I", "dayOutputEnergy"]
 
 
 class BmsData(RawData):
-    """Battery management system (per-pack)."""
+    """Battery management system (per-pack). Frame 0x03/0x03/0x1A."""
 
     hard_ware_ver: Annotated[int, "I", "hardWareVer"]
     card_id_num: Annotated[int, "I", "cardIdNum"]
@@ -166,7 +197,7 @@ class BmsData(RawData):
     bms_type: Annotated[int, "B", "bmsType"]
     soc: Annotated[int, "B", "soc"]
     vol: Annotated[int, "I", "vol"]
-    amp: Annotated[int, "I", "amp"]
+    amp: Annotated[int, "i", "amp"]
     temp: Annotated[int, "B", "temp"]
     charge_state: Annotated[int, "B", "chargeState"]
     open_bms_state: Annotated[int, "B", "openBmsState"]
@@ -181,61 +212,23 @@ class BmsData(RawData):
     max_mos_temp: Annotated[int, "B", "maxMosTemp"]
     min_mos_temp: Annotated[int, "B", "minMosTemp"]
     bms_fault: Annotated[int, "B", "bmsFault"]
-    int_put_watt: Annotated[int, "I", "intPutWatt"]
-    out_put_watt: Annotated[int, "I", "outPutWatt"]
+    int_put_watt: Annotated[int, "i", "intPutWatt"]
+    out_put_watt: Annotated[int, "i", "outPutWatt"]
     remain_time: Annotated[int, "I", "remainTime"]
-    ups_flag: Annotated[int, "B", "upsFlag"]
-    chg_set_soc: Annotated[int, "I", "chgSetSoc"]
-    dsg_set_soc: Annotated[int, "I", "dsgSetSoc"]
-    ptc_allow_flag: Annotated[int, "B", "ptcAllowFlag"]
-    ptc_touch_flag: Annotated[int, "B", "ptcTouchFlag"]
-    ptc_heating_state: Annotated[int, "B", "ptcHeatingState"]
-    ptc_heating_event: Annotated[int, "B", "ptcHeatingEvent"]
-    ptc_heat_err_count: Annotated[int, "B", "ptcHeatErrCount"]
-    ptc_remain_time: Annotated[int, "I", "ptcRemainTime"]
-    lcd_standby_min: Annotated[int, "I", "lcdStandbyMin"]
-    oil_start_soc: Annotated[int, "I", "oilStartSoc"]
-    oil_stop_soc: Annotated[int, "I", "oilStopSoc"]
-    warn_code: Annotated[int, "I", "warnCode"]
-    event_code: Annotated[int, "I", "eventCode"]
-
-
-class IcHighData(RawData):
-    """AC inverter/charger (IC) sub-module."""
-
-    in_vol: Annotated[int, "I", "inVol"]
-    in_cur: Annotated[int, "I", "inCur"]
-    in_watt: Annotated[int, "I", "inWatt"]
-    out_vol: Annotated[int, "I", "outVol"]
-    out_cur: Annotated[int, "I", "outCur"]
-    out_watt: Annotated[int, "I", "outWatt"]
-    out_va: Annotated[int, "I", "outVa"]
-    ac_temp: Annotated[int, "h", "acTemp"]
-    inv_type: Annotated[int, "B", "invType"]
-    in_freq: Annotated[int, "B", "inFreq"]
-    out_freq: Annotated[int, "B", "outFreq"]
-    inv_switch_state: Annotated[int, "B", "invSwitchState"]
-    cfg_out_freq: Annotated[int, "B", "cfgOutFreq"]
-    day_input_energy: Annotated[int, "I", "dayInputEnergy"]
-    day_output_energy: Annotated[int, "I", "dayOutputEnergy"]
-
-    # TODO(capture): the following trailing fields are interrupted by a
-    # variable-length array / nested struct and need a live capture to
-    # confirm size/offset before they can be added:
-    #   app_to_iccfg  (orig appToICCfg, array/nested/string)
-    #   ac_output_power  (orig acOutputPower, I)
-    #   ac_output_cur  (orig acOutputCur, I)
-    #   stand_by_time  (orig standByTime, I)
-    #   pass_by_mode_en  (orig passByModeEn, I)
 
 
 class BmsTotalData(RawData):
-    """Aggregated battery/system totals."""
+    """
+    Aggregated battery/system totals. Frame 0x03/0x03/0x1C.
+
+    Validated against live captures: totalSoc (0x36 -> 54 %, 0x32 -> 50 %) and
+    totalInputWatt (0 while idle) / totalOutputWatt.
+    """
 
     total_soc: Annotated[int, "B", "totalSoc"]
     total_chg_dsg_state: Annotated[int, "B", "totalChgDsgState"]
-    total_input_watt: Annotated[int, "I", "totalInputWatt"]
-    total_output_watt: Annotated[int, "I", "totalOutputWatt"]
+    total_input_watt: Annotated[int, "i", "totalInputWatt"]
+    total_output_watt: Annotated[int, "i", "totalOutputWatt"]
     total_remain_time: Annotated[int, "I", "totalRemainTime"]
     remind_dsg_ptc_flag: Annotated[int, "B", "remindDsgPtcFlag"]
     bms_chg_stop_soc: Annotated[int, "I", "bmsChgStopSoc"]
@@ -246,5 +239,5 @@ class BmsTotalData(RawData):
     lcd_off_confirm_s: Annotated[int, "I", "lcdOffConfirmS"]
     warn_event: Annotated[int, "B", "warnEvent"]
     total_full_cap: Annotated[int, "I", "totalFullCap"]
-    total_amp: Annotated[int, "I", "totalAmp"]
+    total_amp: Annotated[int, "i", "totalAmp"]
     bp_stand_by_time: Annotated[int, "I", "bpStandByTime"]

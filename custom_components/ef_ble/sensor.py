@@ -713,6 +713,8 @@ _SENSORS: Final[dict[str, SensorEntityDescription]] = {
     "dc_input_power": power(precision=2),
     "dc_input_energy": energy(),
     "dc_output_power": power(precision=2),
+    "dc_output_voltage": voltage(precision=2, enabled=False),
+    "dc_output_current": current(precision=2, enabled=False),
     "dc12v_output_power": power(precision=2),
     "dc12v_output_energy": energy(),
     "usba_output_power": power(),
