@@ -724,7 +724,6 @@ _SENSORS: Final[dict[str, SensorEntityDescription]] = {
     ),
     "dc_output_channel_{n}_current": current(
         precision=2,
-        enabled=False,
         translation_key="dc_output_channel_current",
         translation_placeholders={"channel": "{n}"},
         indexed_range=range(1, 13),
