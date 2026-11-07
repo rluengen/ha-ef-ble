@@ -768,6 +768,12 @@ This integration is available in the default HACS repository.
 After installation, the integration will automatically discover supported EcoFlow devices
 via Bluetooth LE.
 
+If setup fails after a Home Assistant upgrade with an error installing
+`protobuf~=6.30` because Home Assistant requires Protobuf 7.x, update this integration
+to a version whose manifest allows `protobuf>=6.31.1,<8`, then restart Home Assistant.
+This is a dependency conflict before Bluetooth setup, not a pairing failure.
+Do not downgrade Home Assistant's Protobuf package to work around it.
+
 > [!TIP]
 > For detailed configuration help, FAQ, and troubleshooting common issues (like BLE
 > disconnections), see the [**Wiki**](https://github.com/rabits/ha-ef-ble/wiki)

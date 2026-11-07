@@ -13,7 +13,7 @@ dependencies = [
   "bluetooth-adapters",
   "crc~=7.1",
   "ecdsa~=0.19",
-  "protobuf~=6.30",
+  "protobuf>=6.31.1,<8",
   "pycryptodome~=3.23",
 ]
 
