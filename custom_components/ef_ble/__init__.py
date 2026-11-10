@@ -88,8 +88,9 @@ def _attach_cert_auth_provider(
     """
     Attach a cloud bind-data provider for certificate/token BLE auth devices.
 
-    Power Kit / "Space" devices (Power Hub, etc.) need an authenticated cloud call at
-    connect time to fetch the per-device bind blob; see eflib/cloud.py.
+    Devices that opt in via `uses_cert_auth` need an authenticated cloud call at connect
+    time to fetch the per-device bind blob; see `eflib/cloud.py`. The Power Hub does not:
+    it uses the standard local md5 auth.
     """
     if not device.uses_cert_auth:
         return

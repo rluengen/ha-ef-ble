@@ -21,6 +21,7 @@ class EcoflowEntity(Entity):
         self._device = device
         self._update_callbacks: list[tuple[str, Callable[[Any], None]]] = []
         self._write_state_props: list[str] = []
+        self._icon_id_field: str | None = None
 
     @property
     def device_info(self):
@@ -84,6 +85,21 @@ class EcoflowEntity(Entity):
             setattr(self, entity_attr, initial)
 
         self._update_callbacks.append((prop_name, state_updated))
+
+    def _register_icon_id_field(self, prop_name: str | None) -> None:
+        if prop_name is None or not hasattr(self._device, prop_name):
+            return
+        self._icon_id_field = prop_name
+        self._register_update_callback(None, prop_name)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attributes = dict(super().extra_state_attributes or {})
+        if self._icon_id_field is not None:
+            icon_id = getattr(self._device, self._icon_id_field, None)
+            if icon_id is not None:
+                attributes["ecoflow_icon_id"] = icon_id
+        return attributes
 
     async def async_added_to_hass(self) -> None:
         for prop, state_callback in self._update_callbacks:
@@ -218,7 +234,9 @@ class DeviceNamedEntity(RestoreEntity):
         if template is None or "{name}" not in template:
             return super().name
 
-        device_name = getattr(self._device, name_field, None) or self._restored_name
+        device_name = getattr(self._device, name_field, None)
+        if device_name is None:
+            device_name = self._restored_name
         placeholders = {
             **(self.translation_placeholders or {}),
             "name": device_name or "",
@@ -234,7 +252,9 @@ class DeviceNamedEntity(RestoreEntity):
             return None
         # Persist the live name, or the restored one when the device has not sent it
         # yet, so the cache survives a session that never reconnected.
-        name = getattr(self._device, name_field, None) or self._restored_name
+        name = getattr(self._device, name_field, None)
+        if name is None:
+            name = self._restored_name
         return _RestoredDeviceName(name)
 
     async def async_added_to_hass(self) -> None:
@@ -268,7 +288,8 @@ def resolve_entity_description_keys[D: EntityDescription](
 
     Descriptions with {n} in their key that are instances of indexed_type with
     indexed_range set are expanded across the range. {n} in translation_placeholder
-    values is also replaced, supporting format specs like {n:02d}.
+    values is also replaced, supporting format specs like {n:02d}. Indexed name
+    and icon-ID field references are expanded alongside the entity key.
     """
     result: dict[str, D] = {}
     for k, v in descriptions.items():
@@ -290,9 +311,10 @@ def resolve_entity_description_keys[D: EntityDescription](
                 "indexed_range": None,
                 "translation_placeholders": placeholders,
             }
-            name_field = getattr(v, "name_field", None)
-            if name_field and "{n}" in name_field:
-                replacements["name_field"] = name_field.replace("{n}", str(i))
+            for field_name in ("name_field", "icon_id_field"):
+                prop_name = getattr(v, field_name, None)
+                if prop_name and "{n}" in prop_name:
+                    replacements[field_name] = prop_name.replace("{n}", str(i))
             result[actual_key] = dataclasses.replace(v, **replacements)
 
     return result

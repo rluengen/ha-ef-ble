@@ -56,6 +56,24 @@
       "ac_output_power": {
         "default": "mdi:current-ac"
       },
+      "ac_output_channel_power": {
+        "default": "mdi:current-ac"
+      },
+      "ac_output_channel_current": {
+        "default": "mdi:current-ac"
+      },
+      "ac_input_energy_today": {
+        "default": "mdi:current-ac"
+      },
+      "ac_output_energy_today": {
+        "default": "mdi:current-ac"
+      },
+      "solar_heatsink_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "solar_pcb_temperature": {
+        "default": "mdi:thermometer"
+      },
       "ac_input_energy": {
         "default": "mdi:current-ac"
       },
@@ -318,6 +336,18 @@
         "state": {
           "off": "mdi:power-plug-off"
         }
+      },
+      "pv1_input": {
+        "default": "mdi:solar-power"
+      },
+      "pv2_input": {
+        "default": "mdi:solar-power"
+      },
+      "dc_input": {
+        "default": "mdi:car-battery"
+      },
+      "ac_input": {
+        "default": "mdi:power-plug"
       },
       "ac_1": {
         "default": "mdi:power-plug",

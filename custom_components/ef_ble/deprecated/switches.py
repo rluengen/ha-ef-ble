@@ -55,6 +55,11 @@ DEPRECATED_SWITCH_TYPES = [
         )
         for n in range(1, 17)
     ],
+    # Power Hub must keep all its switches here until its output controls are migrated.
+    SwitchEntityDescription(key="pv1_input"),
+    SwitchEntityDescription(key="pv2_input"),
+    SwitchEntityDescription(key="dc_input"),
+    SwitchEntityDescription(key="ac_input"),
     SwitchEntityDescription(
         key="disable_grid_bypass",
         name="Disable Grid Bypass",

@@ -61,6 +61,7 @@ class EcoflowSensorEntityDescription[Device: DeviceBase](SensorEntityDescription
     native_unit_of_measurement_field: str | Callable[[Device], str] | None = None
     indexed_range: range | None = None
     name_field: str | None = None
+    icon_id_field: str | None = None
 
 
 class _SensorKwargs(TypedDict, total=False):
@@ -70,6 +71,7 @@ class _SensorKwargs(TypedDict, total=False):
     entity_category: EntityCategory
     state_attribute_fields: list[str]
     name_field: str
+    icon_id_field: str
 
 
 def battery(
@@ -744,19 +746,45 @@ _SENSORS: Final[dict[str, SensorEntityDescription]] = {
     "dc_output_power": power(precision=2),
     "dc_output_voltage": voltage(precision=2, enabled=False),
     "dc_output_current": current(precision=2, enabled=False),
-    # Power Hub DC distribution panel: 12 low-current DC output channels
+    # Power Hub DC distribution panel: 16 DC output channels
     "dc_output_channel_{n}_power": power(
         precision=1,
         translation_key="dc_output_channel_power",
         translation_placeholders={"channel": "{n}"},
-        indexed_range=range(1, 13),
+        indexed_range=range(1, 17),
+        name_field="dc_output_channel_{n}_name",
+        icon_id_field="dc_output_channel_{n}_icon_id",
     ),
     "dc_output_channel_{n}_current": current(
-        precision=2,
+        precision=3,
         translation_key="dc_output_channel_current",
         translation_placeholders={"channel": "{n}"},
-        indexed_range=range(1, 13),
+        indexed_range=range(1, 17),
+        name_field="dc_output_channel_{n}_name",
+        icon_id_field="dc_output_channel_{n}_icon_id",
     ),
+    # Power Hub AC distribution panel: 6 AC output circuits
+    "ac_output_channel_{n}_power": power(
+        precision=1,
+        translation_key="ac_output_channel_power",
+        translation_placeholders={"channel": "{n}"},
+        indexed_range=range(1, 7),
+    ),
+    "ac_output_channel_{n}_current": current(
+        precision=3,
+        translation_key="ac_output_channel_current",
+        translation_placeholders={"channel": "{n}"},
+        indexed_range=range(1, 7),
+    ),
+    "ac_input_energy_today": energy(),
+    "ac_output_energy_today": energy(),
+    "solar_heatsink_{n}_temperature": temperature(
+        translation_key="solar_heatsink_temperature",
+        translation_placeholders={"heatsink": "{n}"},
+        indexed_range=range(1, 3),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "solar_pcb_temperature": temperature(entity_category=EntityCategory.DIAGNOSTIC),
     "dc12v_output_power": power(precision=2),
     "dc12v_output_energy": energy(),
     "usba_output_power": power(),
@@ -1090,6 +1118,9 @@ class EcoflowSensor(EcoflowEntity, SensorEntity):
             if isinstance(self.entity_description, EcoflowSensorEntityDescription)
             else []
         )
+        self._register_icon_id_field(
+            getattr(self.entity_description, "icon_id_field", None)
+        )
 
         self._register_update_callback(None, sensor)
         for attribute_field in self._attribute_fields:
@@ -1117,10 +1148,7 @@ class EcoflowSensor(EcoflowEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        if not self._attribute_fields:
-            return {}
-
-        return {
+        return super().extra_state_attributes | {
             field_name: getattr(self._device, field_name)
             for field_name in self._attribute_fields
             if hasattr(self._device, field_name)

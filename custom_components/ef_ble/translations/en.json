@@ -615,10 +615,28 @@
         "name": "DC Output Power"
       },
       "dc_output_channel_power": {
-        "name": "DC Channel {channel} Power"
+        "name": "DC Channel {channel} {name} Power"
       },
       "dc_output_channel_current": {
-        "name": "DC Channel {channel} Current"
+        "name": "DC Channel {channel} {name} Current"
+      },
+      "ac_output_channel_power": {
+        "name": "AC Channel {channel} Power"
+      },
+      "ac_output_channel_current": {
+        "name": "AC Channel {channel} Current"
+      },
+      "ac_input_energy_today": {
+        "name": "AC Input Energy Today"
+      },
+      "ac_output_energy_today": {
+        "name": "AC Output Energy Today"
+      },
+      "solar_heatsink_temperature": {
+        "name": "Solar Heat Sink {heatsink} Temperature"
+      },
+      "solar_pcb_temperature": {
+        "name": "Solar PCB Temperature"
       },
       "dc12v_output_power": {
         "name": "DC 12V Output Power"
@@ -1213,6 +1231,18 @@
       },
       "dc_ports": {
         "name": "DC Ports"
+      },
+      "pv1_input": {
+        "name": "PV1 Input"
+      },
+      "pv2_input": {
+        "name": "PV2 Input"
+      },
+      "dc_input": {
+        "name": "DC Input"
+      },
+      "ac_input": {
+        "name": "AC Input"
       },
       "ac_ports": {
         "name": "AC Ports"

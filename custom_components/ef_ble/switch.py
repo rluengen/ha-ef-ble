@@ -143,8 +143,10 @@ class EcoflowSwitchEntity(EcoflowEntity, SwitchEntity):
             self._register_update_callback(
                 entity_attr="_attr_name",
                 prop_name=name_prop,
-                get_state=lambda name: name or self.SkipWrite,
+                get_state=lambda name: name or self.entity_description.name,
             )
+
+        self._register_icon_id_field(f"{self._prop_name}_icon_id")
 
         self._register_update_callback(
             entity_attr="_attr_available",
