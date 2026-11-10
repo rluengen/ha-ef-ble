@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 
 from custom_components.ef_ble.deprecated.switches import DEPRECATED_SWITCH_TYPES
 from custom_components.ef_ble.eflib.devices.power_hub import Device
+from custom_components.ef_ble.eflib.exceptions import NotConnectedError
 
 # Raw decrypted BLE frames (payloads still XOR-obfuscated) captured from a live Power Hub;
 # power_hub.packet_parse un-XORs them. One telemetry frame per sub-module.
@@ -34,7 +35,9 @@ def device(mocker: MockerFixture):
         (FRAME_IC_HIGH, 0x04, 0x04, 0x06),
     ],
 )
-async def test_power_hub_routes_and_processes_frames(device, frame, src, cmd_set, cmd_id):
+async def test_power_hub_routes_and_processes_frames(
+    device, frame, src, cmd_set, cmd_id
+):
     packet = await device.packet_parse(bytes.fromhex(frame))
     assert packet is not None
     assert (packet.src, packet.cmd_set, packet.cmd_id) == (src, cmd_set, cmd_id)
@@ -75,13 +78,13 @@ async def test_power_hub_ac_inverter(device):
 
 async def test_power_hub_ac_output_switch_sends_command(device):
     await device.enable_ac_output(True)
-    on_packet = device._conn.sendPacket.call_args[0][0]
+    on_packet = device._conn.send_packet.call_args[0][0]
     assert (on_packet.src, on_packet.dst) == (0x21, 0x02)
     assert (on_packet.cmd_set, on_packet.cmd_id) == (0x02, 0x07)
     assert on_packet.payload == bytes.fromhex("01ffffffffff01ffffff")
 
     await device.enable_ac_output(False)
-    off_packet = device._conn.sendPacket.call_args[0][0]
+    off_packet = device._conn.send_packet.call_args[0][0]
     assert off_packet.payload == bytes.fromhex("00ffffffffff01ffffff")
 
 
@@ -127,14 +130,29 @@ async def test_power_hub_dc_circuit_switch_command(device):
     # The switch entity turns circuits on/off via enable_dc_output_channel_{n}.
     # Circuit 1 on flips bit 0: 0xffde -> 0xffdf, sent as 2-byte LE to the panel.
     await device.enable_dc_output_channel_1(True)
-    pkt = device._conn.sendPacket.call_args[0][0]
+    pkt = device._conn.send_packet.call_args[0][0]
     assert (pkt.src, pkt.dst) == (0x21, 0x54)
     assert (pkt.cmd_set, pkt.cmd_id) == (0x54, 0x10)
     assert pkt.payload == bytes.fromhex("dfff")
 
     # Circuit 2 off flips bit 1: 0xffde -> 0xffdc.
     await device.enable_dc_output_channel_2(False)
-    assert device._conn.sendPacket.call_args[0][0].payload == bytes.fromhex("dcff")
+    assert device._conn.send_packet.call_args[0][0].payload == bytes.fromhex("dcff")
+
+
+@pytest.mark.parametrize("control", ["enable_ac_output", "enable_dc_output_channel_1"])
+async def test_power_hub_disconnected_control_raises(
+    mocker: MockerFixture, control: str
+) -> None:
+    device = Device(
+        mocker.Mock(address="AA:BB:CC:DD:EE:FF"),
+        mocker.MagicMock(),
+        "M3H1TEST_SERIAL",
+    )
+    await device.data_parse(await device.packet_parse(bytes.fromhex(FRAME_DC)))
+
+    with pytest.raises(NotConnectedError):
+        await getattr(device, control)(True)
 
 
 async def test_power_hub_requests_dc_names(device):
@@ -144,7 +162,7 @@ async def test_power_hub_requests_dc_names(device):
     # Seeing the DC panel triggers a circuit-name request (empty read to 0x54/0x54/0x12).
     reqs = [
         c.args[0]
-        for c in device._conn.sendPacket.call_args_list
+        for c in device._conn.send_packet.call_args_list
         if c.args[0].cmd_set == 0x54 and c.args[0].cmd_id == 0x12
     ]
     assert reqs, "no DC name request was sent"

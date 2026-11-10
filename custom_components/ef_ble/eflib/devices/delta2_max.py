@@ -17,6 +17,7 @@ class Device(Delta2Base):
 
     ac_input_power = raw_field(pb_inv.input_watts)
     ac_charging_speed = raw_field(pb_inv.cfg_slow_chg_watts)
+    ac_charging = raw_field(pb_inv.cfg_pause_flag, lambda x: x == 0)
     ac_chg_rated_power = raw_field(pb_inv.ac_chg_rated_power)
     dc_output_power = raw_field(pb_pd.car_watts)
     energy_backup = raw_field(pb_pd.watthisconfig, lambda x: x == 1)
@@ -26,7 +27,7 @@ class Device(Delta2Base):
     xt60_2_input_power = raw_field(pb_pd.pv2_charge_watts)
 
     @computed_field
-    def max_ac_charging_power(self) -> int:
+    def ac_charging_power_max(self) -> int:
         return self.ac_chg_rated_power or 1800
 
     @property
@@ -67,14 +68,28 @@ class Device(Delta2Base):
             min(value, self.battery_charge_limit_max),
         )
         payload = bytes([0x01 if enabled else 0, value, 0x00, 0x00])
-        await self._conn.sendPacket(
-            Packet(0x21, 0x02, 0x20, 0x5E, payload, version=0x02)
+        await self.send_packet(
+            Packet(0x21, 0x02, 0x20, 0x5E, payload, version=0x02),
+            raise_on_failure=True,
         )
 
-    @controls.power(ac_charging_speed, min=1, max=dynamic(max_ac_charging_power))
+    @controls.power(
+        ac_charging_speed,
+        min=dynamic(Delta2Base.ac_charging_speed_min),
+        max=dynamic(ac_charging_power_max),
+    )
     async def set_ac_charging_speed(self, value: float):
         payload = bytes([0xFF, 0xFF]) + int(value).to_bytes(2, "little") + bytes([0xFF])
-        await self._conn.sendPacket(
-            Packet(0x20, 0x04, 0x20, 0x45, payload, version=0x02)
+        await self.send_packet(
+            Packet(0x20, 0x04, 0x20, 0x45, payload, version=0x02),
+            raise_on_failure=True,
         )
         return True
+
+    @controls.switch(ac_charging)
+    async def enable_ac_charging(self, enabled: bool):
+        payload = bytes([0xFF, 0xFF, 0xFF, 0xFF, 0 if enabled else 1])
+        await self.send_packet(
+            Packet(0x20, 0x04, 0x20, 0x45, payload, version=0x02),
+            raise_on_failure=True,
+        )

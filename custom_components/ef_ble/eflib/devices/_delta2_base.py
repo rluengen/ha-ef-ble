@@ -1,3 +1,4 @@
+from ..device_options import UNLOCK_AC_CHARGING_MINIMUM, option_field
 from ..devicebase import DeviceBase
 from ..entity import controls
 from ..entity.base import dynamic
@@ -26,6 +27,18 @@ class _BmsHeartbeatBattery1(DirectBmsMDeltaHeartbeatPack):
 
 class _BmsHeartbeatBattery2(DirectBmsMDeltaHeartbeatPack):
     pass
+
+
+# The BMS heartbeats carry their own slot number in `num`: 0 is the device's own pack
+# and 1-2 are the attached extra batteries. The source address does not identify the
+# slot - every extra battery reports on 0x06, so routing on the address alone sent both
+# packs into slot 1 and left slot 2 empty.
+_BMS_HEARTBEAT_BY_SLOT = {
+    0: _BmsHeartbeatBatteryMain,
+    1: _BmsHeartbeatBattery1,
+    2: _BmsHeartbeatBattery2,
+}
+_SLOTS = frozenset(_BMS_HEARTBEAT_BY_SLOT)
 
 
 pb_pd = dataclass_attr_mapper(BasePdHeart)
@@ -57,11 +70,21 @@ class Delta2Base(DeviceBase, RawDataProps):
     battery_1_enabled = Field[bool]()
     battery_1_battery_level = Field[float]()
     battery_1_cell_temperature = raw_field(pb_bms_1.max_cell_temp)
+    battery_1_voltage = raw_field(pb_bms_1.vol, pdiv(1000, 2))
+    battery_1_max_cell_voltage = raw_field(pb_bms_1.max_cell_vol, pdiv(1000, 3))
+    battery_1_min_cell_voltage = raw_field(pb_bms_1.min_cell_vol, pdiv(1000, 3))
+    battery_1_input_power = raw_field(pb_bms_1.input_watts)
+    battery_1_output_power = raw_field(pb_bms_1.output_watts)
     battery_1_sn = Field[str]()
 
     battery_2_enabled = Field[bool]()
     battery_2_battery_level = Field[float]()
     battery_2_cell_temperature = raw_field(pb_bms_2.max_cell_temp)
+    battery_2_voltage = raw_field(pb_bms_2.vol, pdiv(1000, 2))
+    battery_2_max_cell_voltage = raw_field(pb_bms_2.max_cell_vol, pdiv(1000, 3))
+    battery_2_min_cell_voltage = raw_field(pb_bms_2.min_cell_vol, pdiv(1000, 3))
+    battery_2_input_power = raw_field(pb_bms_2.input_watts)
+    battery_2_output_power = raw_field(pb_bms_2.output_watts)
     battery_2_sn = Field[str]()
 
     battery_level = raw_field(pb_ems.f32_lcd_show_soc, pround(2))
@@ -88,6 +111,9 @@ class Delta2Base(DeviceBase, RawDataProps):
     remaining_time_discharging = raw_field(pb_ems.dsg_remain_time)
 
     cell_temperature = raw_field(pb_bms.max_cell_temp)
+    battery_voltage = raw_field(pb_bms.vol, pdiv(1000, 2))
+    max_cell_voltage = raw_field(pb_bms.max_cell_vol, pdiv(1000, 3))
+    min_cell_voltage = raw_field(pb_bms.min_cell_vol, pdiv(1000, 3))
 
     dc_input_voltage = raw_field(pb_mppt.in_vol, pdiv(1000, 2))
     dc_input_current = raw_field(pb_mppt.in_amp, pdiv(1000, 2))
@@ -95,6 +121,10 @@ class Delta2Base(DeviceBase, RawDataProps):
     dc_12v_port = raw_field(pb_pd.car_state, lambda x: x == 1)
     dc12v_output_voltage = raw_field(pb_mppt.car_out_vol, pdiv(1000, 2))
     dc12v_output_current = raw_field(pb_mppt.car_out_amp, pdiv(1000, 2))
+
+    ac_charging_speed_min = option_field(
+        UNLOCK_AC_CHARGING_MINIMUM, enabled=1, disabled=200
+    )
 
     @property
     def pd_heart_type(self):
@@ -112,10 +142,12 @@ class Delta2Base(DeviceBase, RawDataProps):
     def device(self):
         model = "2"
         match self._sn[:4]:
-            case "D361":
+            case "D361" | "D365":
                 model = "3 1500"
             case "R351" | "R354":
                 model = "2 Max"
+            case "R701":
+                model = "2 Black"
 
         return f"Delta {model}"
 
@@ -141,17 +173,18 @@ class Delta2Base(DeviceBase, RawDataProps):
             case 0x03, 0x20, 0x02:
                 self.update_from_bytes(DirectEmsDeltaHeartbeatPack, packet.payload)
                 processed = True
-            case 0x03, 0x20, 0x32:
-                self.update_from_bytes(_BmsHeartbeatBatteryMain, packet.payload)
-                processed = True
-            case 0x06, 0x20, 0x32:
-                self.update_from_bytes(_BmsHeartbeatBattery1, packet.payload)
-                processed = True
+            case _, 0x20, 0x32:
+                processed = self._parse_bms_heartbeat(packet.payload)
             case 0x04, _, 0x02:
                 self.update_from_bytes(DirectInvDeltaHeartbeatPack, packet.payload)
                 processed = True
             case 0x05, 0x20, 0x02:
                 self.update_from_bytes(self.mppt_heart_type, packet.payload)
+                processed = True
+            case _, 0x20, 0x58:
+                processed = self._parse_module_info(packet.payload)
+            case 0x35, 0x35, 0x20:
+                self._logger.debug("Ping received: %r", packet)
                 processed = True
 
         self._notify_updated()
@@ -165,7 +198,7 @@ class Delta2Base(DeviceBase, RawDataProps):
     @controls.switch(usb_ports)
     async def enable_usb_ports(self, enabled: bool):
         packet = Packet(0x21, 0x02, 0x20, 0x22, enabled.to_bytes(), version=0x02)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
 
     @controls.switch(dc_12v_port)
     async def enable_dc_12v_port(self, enabled: bool):
@@ -177,13 +210,13 @@ class Delta2Base(DeviceBase, RawDataProps):
             enabled.to_bytes(),
             version=0x02,
         )
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
 
     @controls.outlet(ac_ports)
     async def enable_ac_ports(self, enabled: bool):
         payload = bytes([1 if enabled else 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
         packet = Packet(0x21, self.ac_commands_dst, 0x20, 0x42, payload, version=0x02)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
 
     @controls.battery(battery_charge_limit_max, min=dynamic(battery_charge_limit_min))
     async def set_battery_charge_limit_max(self, limit: float):
@@ -193,7 +226,7 @@ class Delta2Base(DeviceBase, RawDataProps):
         ):
             return False
         packet = Packet(0x21, 0x03, 0x20, 0x31, int(limit).to_bytes(), version=0x02)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
         return True
 
     @controls.battery(battery_charge_limit_min, max=dynamic(battery_charge_limit_max))
@@ -204,7 +237,36 @@ class Delta2Base(DeviceBase, RawDataProps):
         ):
             return False
         packet = Packet(0x21, 0x03, 0x20, 0x33, int(limit).to_bytes(), version=0x02)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
+        return True
+
+    def _parse_module_info(self, payload: bytes) -> bool:
+        """
+        Recognize the per-module info report, keyed by pack index like the BMS
+
+        Byte 0 is the slot and `[1:17]` the serial, which `AllKitDetailData`
+        already reports. `[18:34]` holds four monotonic counters that pair up and
+        look like milliamp-hours over watt-hours, but reading the pairs as charge
+        and discharge implies either 110.6% round-trip or 73.6% coulombic
+        efficiency, so the model is wrong somewhere and none of it is wired up.
+        Settling it needs a controlled charge with no load, not another capture.
+        """
+        if not payload or payload[0] not in _SLOTS:
+            return False
+
+        self._logger.debug("Module info received for slot %s", payload[0])
+        return True
+
+    def _parse_bms_heartbeat(self, payload: bytes) -> bool:
+        """Route a BMS heartbeat to the slot named by `num` in its payload"""
+        if not payload:
+            return False
+
+        heartbeat_type = _BMS_HEARTBEAT_BY_SLOT.get(payload[0])
+        if heartbeat_type is None:
+            return False
+
+        self.update_from_bytes(heartbeat_type, payload)
         return True
 
     def _update_extra_batteries(self, kit_data: AllKitDetailData):

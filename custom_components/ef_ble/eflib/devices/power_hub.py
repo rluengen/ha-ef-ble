@@ -176,7 +176,7 @@ class Device(DeviceBase, RawDataProps):
         return Packet.from_bytes(data, xor_payload=True)
 
     # NOTE: The Power Hub authenticates with the standard local md5(userId + sn)
-    # handshake (see connection.autoAuthentication) - the same as other EcoFlow
+    # handshake (see connection._auto_authentication) - the same as other EcoFlow
     # devices. The EcoFlow app's "machine"/getSignatureInfo (0xA8) and cloud
     # cert/token paths were investigated but are NOT used by the consumer Power
     # Hub: the device ignores 0xA8, and the app computes the BLE secret locally as
@@ -219,9 +219,7 @@ class Device(DeviceBase, RawDataProps):
             return True
 
         # Route each mapped sub-module frame to its RawData struct.
-        model = self._MODULE_FRAMES.get(
-            (packet.src, packet.cmd_set, packet.cmd_id)
-        )
+        model = self._MODULE_FRAMES.get((packet.src, packet.cmd_set, packet.cmd_id))
         if model is not None:
             self.update_from_bytes(model, packet.payload)
             processed = True
@@ -272,7 +270,13 @@ class Device(DeviceBase, RawDataProps):
         self._dc_names_loaded = True
 
     async def _send_config_packet(
-        self, dst: int, cmd_set: int, cmd_id: int, payload: bytes
+        self,
+        dst: int,
+        cmd_set: int,
+        cmd_id: int,
+        payload: bytes,
+        *,
+        raise_on_failure: bool = False,
     ) -> None:
         packet = Packet(
             src=0x21,
@@ -282,7 +286,7 @@ class Device(DeviceBase, RawDataProps):
             payload=payload,
             version=self.packet_version,
         )
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=raise_on_failure)
 
     async def enable_ac_output(self, enabled: bool) -> None:
         """
@@ -295,10 +299,8 @@ class Device(DeviceBase, RawDataProps):
         other AC settings as "leave unchanged".
         """
         onoff = 0x01 if enabled else 0x00
-        payload = bytes(
-            (onoff, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0xFF, 0xFF, 0xFF)
-        )
-        await self._send_config_packet(0x02, 0x02, 0x07, payload)
+        payload = bytes((onoff, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0xFF, 0xFF, 0xFF))
+        await self._send_config_packet(0x02, 0x02, 0x07, payload, raise_on_failure=True)
 
     async def set_dc_circuit(self, circuit: int, enabled: bool) -> None:
         """
@@ -320,5 +322,9 @@ class Device(DeviceBase, RawDataProps):
         else:
             new_states = current & ~(1 << bit)
         await self._send_config_packet(
-            0x54, 0x54, 0x10, new_states.to_bytes(2, "little")
+            0x54,
+            0x54,
+            0x10,
+            new_states.to_bytes(2, "little"),
+            raise_on_failure=True,
         )

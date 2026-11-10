@@ -2,6 +2,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from custom_components.ef_ble.eflib.devices.delta2_max import Device
+from custom_components.ef_ble.eflib.packet import Packet
 
 
 @pytest.fixture
@@ -175,8 +176,8 @@ async def test_delta2_max_ac_charging_power_limits(device, packet_sequence):
         packet = await device.packet_parse(bytes.fromhex(hex_packet))
         await device.data_parse(packet)
 
-    assert device.max_ac_charging_power == 1800, (
-        f"Max AC charging power should be 1800W, got {device.max_ac_charging_power}"
+    assert device.ac_charging_power_max == 1800, (
+        f"Max AC charging power should be 1800W, got {device.ac_charging_power_max}"
     )
 
 
@@ -200,10 +201,13 @@ async def test_delta2_max_exact_values_from_known_packets(device, packet_sequenc
         Device.usbc_output_power: 0,
         Device.usba_output_power: 0,
         Device.cell_temperature: 18,
+        Device.battery_voltage: 53.29,
+        Device.max_cell_voltage: 3.334,
+        Device.min_cell_voltage: 3.332,
         Device.ac_ports: True,
         Device.usb_ports: False,
         Device.dc_12v_port: False,
-        Device.max_ac_charging_power: 1800,
+        Device.ac_charging_power_max: 1800,
         Device.energy_backup: False,
         Device.ac_charging_speed: 300,
         Device.remaining_time_charging: 5999,
@@ -219,3 +223,17 @@ async def test_delta2_max_exact_values_from_known_packets(device, packet_sequenc
         assert actual_value == expected_value, (
             f"{field_name}: expected {expected_value}, got {actual_value}"
         )
+
+
+async def test_delta2_max_acknowledges_ping(device):
+    """
+    A keepalive is handled rather than left to the unprocessed-packet log
+
+    Payload taken from a real Delta 2 Max log; other devices treat the same
+    src/cmd_set/cmd_id triple as a ping and ignore its contents.
+    """
+    ping = Packet(
+        0x35, 0x20, 0x35, 0x20, bytes.fromhex("040056007f007300"), version=0x02
+    )
+
+    assert await device.data_parse(ping) is True

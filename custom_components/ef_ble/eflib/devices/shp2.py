@@ -130,6 +130,7 @@ class Device(DeviceBase, ProtobufProps):
     circuit_current = field_group(lambda n: CircuitCurrentField(n - 1), count=12)
 
     circuit = _circuit_sta_group(_hall1.ch1_sta.load_sta)
+    circuit_name = _circuit_info_group(_hall1.ch1_info.ch_name)
     circuit_split_link = _circuit_info_group(_hall1.ch1_info.splitphase.link_ch)
     circuit_split_info_loaded = _circuit_info_group(
         _hall1.ch1_info.splitphase.link_ch, transform=lambda value: value is not None
@@ -197,8 +198,8 @@ class Device(DeviceBase, ProtobufProps):
         pb_push_set.foce_charge_hight, lambda v: v is not None
     )
     eps_mode = pb_field(pb_push_set.eps_mode_info)
-    min_ac_charging_power = 500
-    max_ac_charging_power = 7200
+    ac_charging_power_min = 500
+    ac_charging_power_max = 7200
     ac_charging_speed_step = 100
     ac_charging_speed = pb_field(pb_push_set.charge_watt_power)
 
@@ -234,13 +235,13 @@ class Device(DeviceBase, ProtobufProps):
             case 0x0B, 0x0C, 0x01:
                 # master_info, load_info, backup_info, watt_info, master_ver_info
                 self._logger.debug("Parsed data: %r", packet)
-                await self._conn.replyPacket(packet)
+                await self._conn.reply_packet(packet)
                 self.update_from_bytes(pd303_pb2.ProtoTime, packet.payload)
                 processed = True
 
             case 0x0B, 0x0C, 0x20:  # backup_incre_info
                 self._logger.debug("Parsed data: %r", packet)
-                await self._conn.replyPacket(packet)
+                await self._conn.reply_packet(packet)
                 self.update_from_bytes(pd303_pb2.ProtoPushAndSet, packet.payload)
                 processed = True
 
@@ -274,7 +275,7 @@ class Device(DeviceBase, ProtobufProps):
     async def _send_config_packet(self, message):
         payload = message.SerializeToString()
         packet = Packet(0x21, 0x0B, 0x0C, 0x21, payload, 0x01, 0x01, 0x13)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
 
     async def set_config_flag(self, enable):
         """Send command to enable/disable sending config data from device to the host"""
@@ -291,7 +292,8 @@ class Device(DeviceBase, ProtobufProps):
         control=controls.outlet,
         availability=circuit_split_info_loaded,
         translation_key="circuit_is_enabled",
-        translation_placeholders=lambda i: {"circuit": str(i)},
+        translation_placeholders=lambda i: {"circuit": f"{i:02d}"},
+        name_field=lambda i: f"circuit_name_{i}",
     )
     async def set_circuit_power(self, circuit_id: int, enable: bool):
         """Send command to power on / off the specific circuit of the panel"""
@@ -465,8 +467,8 @@ class Device(DeviceBase, ProtobufProps):
 
     @controls.power(
         ac_charging_speed,
-        min=min_ac_charging_power,
-        max=max_ac_charging_power,
+        min=ac_charging_power_min,
+        max=ac_charging_power_max,
         step=ac_charging_speed_step,
     )
     async def set_ac_charging_speed(self, value: float):
@@ -477,10 +479,10 @@ class Device(DeviceBase, ProtobufProps):
         # Round to nearest 100 and limit to allowed range
         value = min(
             max(
-                self.min_ac_charging_power,
+                self.ac_charging_power_min,
                 int(value / self.ac_charging_speed_step) * self.ac_charging_speed_step,
             ),
-            self.max_ac_charging_power,
+            self.ac_charging_power_max,
         )
         ppas.charge_watt_power = value
 

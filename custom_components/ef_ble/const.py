@@ -12,9 +12,14 @@ CONF_PACKET_VERSION = "packet_version"
 CONF_COLLECT_PACKETS = "collect_packets"
 CONF_COLLECT_PACKETS_AMOUNT = "collect_packets_amount"
 CONF_EXTRA_BATTERY = "extra_battery"
+CONF_DEVICE_OPTIONS = "device_options"
 
 CONF_ADVANCED_CONNECTION_OPTIONS = "advanced_connection_options"
 CONF_BLUEZ_START_NOTIFY = "bluez_start_notify"
+CONF_CONNECTION_DELAY = "connection_delay"
+CONF_PREFERRED_PROXY = "preferred_proxy"
+CONF_PREFERRED_PROXY_TIMEOUT = "preferred_proxy_timeout"
+NO_PREFERRED_PROXY = "any"
 
 CONF_DIAGNOSTICS_OPTIONS = "diagnostics_options"
 CONF_DIAGNOSTICS_ENCRYPT = "diagnostics_encrypt"
@@ -31,6 +36,8 @@ CONF_LOG_BLEAK = "log_bleak"
 
 DEFAULT_UPDATE_PERIOD = 10
 DEFAULT_CONNECTION_TIMEOUT = 20
+DEFAULT_CONNECTION_DELAY = 1.0
+DEFAULT_PREFERRED_PROXY_TIMEOUT = 30.0
 
 
 LINK_WIKI_SUPPORTING_NEW_DEVICES = (

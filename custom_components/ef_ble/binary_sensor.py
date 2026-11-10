@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from custom_components.ef_ble.eflib import DeviceBase
-from custom_components.ef_ble.eflib.devices import shp2
+from custom_components.ef_ble.eflib.devices import shp2, shp3
 
 from . import DeviceConfigEntry
 from .entity import EcoflowEntity, resolve_entity_description_keys
@@ -107,6 +107,14 @@ def battery_charging(
 _shp2_channel_range = range(1, shp2.Device.NUM_OF_CHANNELS + 1)
 
 
+def port_enabled(name: str) -> EcoflowBinarySensorEntityDescription:
+    return power(
+        translation_key="port_enabled",
+        translation_placeholders={"name": name},
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+
+
 def shp2_channel(
     fn: Callable[..., EcoflowBinarySensorEntityDescription],
     translation_key: str,
@@ -124,6 +132,8 @@ def shp2_channel(
 _BINARY_SENSORS: Final[dict[str, BinarySensorEntityDescription]] = {
     "error_happened": problem("error", entity_category=EntityCategory.DIAGNOSTIC),
     "plugged_in_ac": plug(),
+    "battery_connected": connectivity(),
+    "solar_connected": connectivity(),
     "fan_running": _make_desc(
         BinarySensorDeviceClass.RUNNING,
         enabled=False,
@@ -132,9 +142,16 @@ _BINARY_SENSORS: Final[dict[str, BinarySensorEntityDescription]] = {
     "error_occurred": problem(
         enabled=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        state_attribute_fields=["error_code"],
+        state_attribute_fields=["error_code", "device_error_codes"],
     ),
     "bms_run_state": power(enabled=False, entity_category=EntityCategory.DIAGNOSTIC),
+    # Rapid Pro 320W port state telemetry
+    "usb_c1_port_enabled": port_enabled("USB-C 1"),
+    "usb_c2_port_enabled": port_enabled("USB-C 2"),
+    "usb_c3_port_enabled": port_enabled("USB-C 3"),
+    "usb_c4_port_enabled": port_enabled("USB-C 4"),
+    "usb_a1_port_enabled": port_enabled("USB-A 1"),
+    "pogo_port_enabled": port_enabled("Pogo"),
     # SHP2 backup channel binary sensors
     "ch{n}_backup_is_ready": shp2_channel(
         battery, "channel_backup_is_ready", enabled=False
@@ -162,6 +179,15 @@ _BINARY_SENSORS: Final[dict[str, BinarySensorEntityDescription]] = {
     # SHP2 generic binary sensors
     "grid_status": connectivity(enabled=True),
     "storm_mode": safety(enabled=True),
+    # SHP3
+    "grid_is_energized": connectivity(enabled=True),
+    "ch{n}_signal_line": connectivity(
+        translation_key="backup_channel_signal_line",
+        translation_placeholders={"channel": "{n}"},
+        indexed_range=range(1, shp3.Device.NUM_OF_CHANNELS + 1),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        enabled=False,
+    ),
     # DPU
     "is_charging": battery_charging(
         enabled=False, entity_category=EntityCategory.DIAGNOSTIC

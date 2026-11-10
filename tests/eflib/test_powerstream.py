@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from pytest_mock import MockerFixture
 
@@ -163,7 +165,9 @@ async def test_powerstream_exact_values_from_known_packets(device, packet_sequen
         await device.data_parse(await device.packet_parse(bytes.fromhex(packet)))
 
     expected = {
-        Device.battery_level: 31.02,
+        Device.battery_level: 46.15,
+        Device.lcd_battery_level: 31.02,
+        Device.bms_battery_level: 31,
         Device.battery_power: 0.0,
         Device.battery_temperature: 21.0,
         Device.pv_power_1: 6.0,
@@ -179,6 +183,7 @@ async def test_powerstream_exact_values_from_known_packets(device, packet_sequen
         Device.inverter_current: 0.35,
         Device.inverter_frequency: 49.9,
         Device.inverter_temperature: 0.0,
+        Device.feed_protect: False,
     }
 
     for field_name, expected_value in expected.items():
@@ -186,3 +191,15 @@ async def test_powerstream_exact_values_from_known_packets(device, packet_sequen
         assert actual_value == expected_value, (
             f"{field_name}: expected {expected_value}, got {actual_value}"
         )
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_powerstream_set_feed_protect_sends_int(device, enabled):
+    device._send_ble_packet = AsyncMock()
+
+    await device.set_feed_protect(enabled)
+
+    device._send_ble_packet.assert_awaited_once()
+    message = device._send_ble_packet.await_args.args[0]
+    assert message.feed_protect == int(enabled)
+    assert device._send_ble_packet.await_args.kwargs["cmd_id"] == 0x8F

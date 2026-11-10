@@ -35,6 +35,10 @@ and accessories through **Bluetooth LE**, allowing you to:
 
 ## Supported Devices
 
+> [!IMPORTANT]
+> According to agreement with Ecoflow we can't add new devices after release v1.3.0
+> ([details](https://github.com/rabits/ha-ef-ble/discussions/521)).
+
 Click on any device below to see available sensors, switches, and controls:
 
 <br>
@@ -69,6 +73,37 @@ Click on any device below to see available sensors, switches, and controls:
 
 > **📝 Note:** Using an ESPHome bluetooth proxy connection with a Smart Home Panel 2 can result in
 > slow performance and dropped packets at this time. Please see the
+> [Issue #221](https://github.com/rabits/ha-ef-ble/issues/221) for tracking.
+
+</details>
+<details>
+<summary><b>Smart Home Panel 3</b></summary>
+
+<br>
+
+| *Sensors*                          | *Switches*                          | *Sliders*            | *Selects*      |
+|------------------------------------|-------------------------------------|----------------------|----------------|
+| Battery Level                      | Circuit On/Off (Each Circuit)       | Charge Limit         | Operating Mode |
+| Battery Power                      | Channel On/Off (Each Channel)       | Discharge Limit      |                |
+| System Load                        | Storm Guard                         | Backup Reserve Level |                |
+| Load From Grid                     | EPS Mode                            | AC Charging Speed    |                |
+| PV Power Total                     | Channel Force Charge (Each Channel) |                      |                |
+| Grid Connection Status             |                                     |                      |                |
+| Grid Energized                     |                                     |                      |                |
+| Charge Time Remaining              |                                     |                      |                |
+| Discharge Time Remaining           |                                     |                      |                |
+| L1 / L2 / L3 Power                 |                                     |                      |                |
+| L1 / L2 / L3 Voltage               |                                     |                      |                |
+| L1 / L2 / L3 Current               |                                     |                      |                |
+| Circuit Power (Each Circuit)       |                                     |                      |                |
+| Circuit Current (Each Circuit)     |                                     |                      |                |
+| Circuit Voltage (Each Circuit)     |                                     |                      |                |
+| Circuit Status (Each Circuit)      |                                     |                      |                |
+| Channel Type (Each Channel)        |                                     |                      |                |
+| Channel Signal Line (Each Channel) |                                     |                      |                |
+
+> **📝 Note:** Using an ESPHome bluetooth proxy connection with a Smart Home Panel 3 can
+> result in slow performance and dropped packets at this time. Please see the
 > [Issue #221](https://github.com/rabits/ha-ef-ble/issues/221) for tracking.
 
 </details>
@@ -313,8 +348,8 @@ Click on any device below to see available sensors, switches, and controls:
 |-------------------------------------|----------------|----------------------|
 | Main Battery Level                  | AC Ports       | Backup Reserve Level |
 | Battery Level                       | DC Ports       | Max Charge Limit     |
-| Extra Battery Level ¹               | Backup Reserve | Min Discharge Limit  |
-| Extra Battery Temperature ¹         |                | AC Charging Speed    |
+| Extra Battery Level ¹               | USB Ports      | Min Discharge Limit  |
+| Extra Battery Temperature ¹         | Backup Reserve | AC Charging Speed    |
 | AC Input Power                      |                |                      |
 | AC LV Output Power                  |                |                      |
 | AC HV Output Power                  |                |                      |
@@ -333,10 +368,17 @@ Click on any device below to see available sensors, switches, and controls:
 | USB C (2) Output Power              |                |                      |
 | AC Plugged In                       |                |                      |
 | Cell Temperature (disabled)         |                |                      |
+| State of Health (disabled)          |                |                      |
+| Battery Input Power (disabled)      |                |                      |
+| Battery Output Power (disabled)     |                |                      |
+| AC 5P8 In Power                     |                |                      |
+| AC 5P8 Out Power                    |                |                      |
+| AC LV TT-30 Output Power (disabled) |                |                      |
 | Charge Time Remaining (disabled)    |                |                      |
 | Discharge Time Remaining (disabled) |                |                      |
 | Error Occurred (disabled) ²         |                |                      |
 | BMS Run State (disabled)            |                |                      |
+| Fan Running (disabled)              |                |                      |
 
 <sup>¹ Per extra battery (up to 2)</sup>
 <sup>² Includes error code as an extra attribute</sup>
@@ -448,6 +490,34 @@ Click on any device below to see available sensors, switches, and controls:
 </details>
 
 <details>
+<summary><b>STREAM Microinverter (US)</b></summary>
+
+<br>
+
+| *Sensors*                         | *Sliders*            |
+|-----------------------------------|----------------------|
+| Grid Power                        | Maximum Output Power |
+| Grid Voltage                      |                      |
+| Grid Current                      |                      |
+| Grid Frequency                    |                      |
+| Grid Connection Status            |                      |
+| PV (1) Power                      |                      |
+| PV (1) Current                    |                      |
+| PV (1) Voltage                    |                      |
+| PV (2) Power                      |                      |
+| PV (2) Current                    |                      |
+| PV (2) Voltage                    |                      |
+| PV (3) Power                      |                      |
+| PV (3) Current                    |                      |
+| PV (3) Voltage                    |                      |
+| PV (4) Power                      |                      |
+| PV (4) Current                    |                      |
+| PV (4) Voltage                    |                      |
+| WiFi RSSI (disabled)              |                      |
+
+</details>
+
+<details>
 <summary><b>PowerStream</b></summary>
 
 <br>
@@ -485,6 +555,26 @@ Click on any device below to see available sensors, switches, and controls:
 | AC Output Voltage (disabled) |
 | AC Output Current (disabled) |
 | AC Plug State                |
+
+</details>
+
+<details>
+<summary><b>Rapid Pro 320W Charger</b></summary>
+
+<br>
+
+| *Sensors*                                  | *Binary Sensors*                        | *Switches*      |
+|--------------------------------------------|-----------------------------------------|-----------------|
+| Battery Level                              | USB-C 1-4 / USB-A 1 / Pogo Port Enabled | USB-C 1-4 Port  |
+| State of Health (disabled)                 | Error Occurred (disabled)               | USB-A 1 Port    |
+| Cell Temperature (disabled)                |                                         | Pogo Port       |
+| Input Power                                |                                         |                 |
+| Output Power                               |                                         |                 |
+| USB-C 1-4 / USB-A 1 / Pogo Power           |                                         |                 |
+| USB-C 1-4 / USB-A 1 / Pogo Voltage         |                                         |                 |
+| USB-C 1-4 / USB-A 1 / Pogo Current         |                                         |                 |
+| Remaining Time Charging (disabled)         |                                         |                 |
+| Remaining Time Discharging (disabled)      |                                         |                 |
 
 </details>
 
@@ -568,7 +658,7 @@ Click on any device below to see available sensors, switches, and controls:
 </details>
 
 <details>
-<summary><b>Delta 2</b> <i>(Max, Delta 3 1500)</i></summary>
+<summary><b>Delta 2</b> <i>(Max, Black (E980), Delta 3 1500)</i></summary>
 
 <br>
 

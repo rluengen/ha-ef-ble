@@ -22,7 +22,7 @@ class GridStatus(IntFieldValue):
 class Device(DeviceBase, ProtobufProps):
     """STREAM Microinverter"""
 
-    SN_PREFIX = (b"BK01", b"BK02", b"N011")
+    SN_PREFIX = (b"BK01", b"BK02")
     NAME_PREFIX = "EF-BK"
 
     pv_power_1 = pb_field(pb.pow_get_pv, pround(2))
@@ -65,10 +65,10 @@ class Device(DeviceBase, ProtobufProps):
         return processed
 
     async def _send_config_packet(self, message: bk_series_pb2.ConfigWrite):
-        payload = message.SerializeToString()
         message.cfg_utc_time = round(time.time())
+        payload = message.SerializeToString()
         packet = Packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
 
     async def set_inverter_target_power(self, power: int):
         if power < 0:

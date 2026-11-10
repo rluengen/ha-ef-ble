@@ -126,6 +126,13 @@ class EnergyStrategy(IntFieldValue):
         return operate_mode
 
 
+class EnergyMonitoringMode(IntFieldValue):
+    SEMI_AUTOMATED = 1
+    SMART_METER = 2
+
+    UNKNOWN = -1
+
+
 class Device(DeviceBase, ProtobufProps):
     """STREAM AC"""
 
@@ -162,13 +169,17 @@ class Device(DeviceBase, ProtobufProps):
         EnergyStrategy.from_pb,
     )
     energy_backup_battery_level = pb_field(pb.backup_reverse_soc)
+    energy_monitoring_mode = pb_field(
+        pb.pow_consumption_measurement,
+        EnergyMonitoringMode.from_value,
+    )
 
     grid_in_power_limit = pb_field(pb.sys_grid_in_pwr_limit)
-    max_ac_in_power = pb_field(pb.pow_sys_ac_in_max)
-    max_ac_out_power = pb_field(pb.pow_sys_ac_out_max)
+    ac_in_power_max = pb_field(pb.pow_sys_ac_in_max)
+    ac_out_power_max = pb_field(pb.pow_sys_ac_out_max)
 
     _resident_load = ResidentLoad()
-    max_bp_input = pb_field(pb.max_bp_input)
+    bp_input_max = pb_field(pb.max_bp_input)
 
     _charging_task = ChargingTimerTask()
     _discharging_task = DischargingTimerTask()
@@ -260,7 +271,7 @@ class Device(DeviceBase, ProtobufProps):
         message.cfg_utc_time = round(time.time())
         payload = message.SerializeToString()
         packet = Packet(0x20, 0x02, 0xFE, 0x11, payload, 0x01, 0x01, 0x13)
-        await self._conn.sendPacket(packet)
+        await self.send_packet(packet, raise_on_failure=True)
 
     @controls.battery(
         battery_charge_limit_max,
@@ -314,6 +325,15 @@ class Device(DeviceBase, ProtobufProps):
         strategy.as_pb(cfg.cfg_energy_strategy_operate_mode)
         await self._send_config_packet(cfg)
 
+    @controls.select(energy_monitoring_mode, options=EnergyMonitoringMode)
+    async def set_energy_monitoring_mode(self, mode: EnergyMonitoringMode):
+        if mode is EnergyMonitoringMode.UNKNOWN:
+            return
+
+        await self._send_config_packet(
+            bk_series_pb2.ConfigWrite(cfg_pow_consumption_measurement=mode.value)
+        )
+
     @controls.power(
         base_load_power,
         max=dynamic(feed_grid_pow_max),
@@ -338,9 +358,9 @@ class Device(DeviceBase, ProtobufProps):
         )
         return True
 
-    @controls.power(grid_in_power_limit, max=dynamic(max_ac_in_power))
+    @controls.power(grid_in_power_limit, max=dynamic(ac_in_power_max))
     async def set_grid_in_pow_limit(self, value: float):
-        if self.max_ac_in_power is None or value > self.max_ac_in_power or value < 0:
+        if self.ac_in_power_max is None or value > self.ac_in_power_max or value < 0:
             return False
 
         await self._send_config_packet(
@@ -350,7 +370,7 @@ class Device(DeviceBase, ProtobufProps):
 
     @controls.power(
         charging_grid_power_limit,
-        max=dynamic(max_bp_input),
+        max=dynamic(bp_input_max),
         availability=dynamic(charging_grid_power_limit_enabled),
     )
     async def set_charging_grid_power_limit(self, limit: float):
@@ -380,7 +400,8 @@ class Device(DeviceBase, ProtobufProps):
             if target is None or self._all_timer_tasks is None:
                 return False
 
-            chain.pending_mods.append((target.task_index, modify))
+            pending_mod = (target.task_index, modify)
+            chain.pending_mods.append(pending_mod)
 
             config = bk_series_pb2.ConfigWrite()
 
@@ -392,7 +413,15 @@ class Device(DeviceBase, ProtobufProps):
                     if task.task_index == mod_idx:
                         mod_fn(new_task)
 
-            await self._send_config_packet(config)
+            sent = False
+            try:
+                await self._send_config_packet(config)
+                sent = True
+            finally:
+                # If the send failed the mod never reached the device, so drop it;
+                # otherwise it would be silently re-applied on the next successful edit
+                if not sent:
+                    chain.pending_mods.remove(pending_mod)
 
             # Clear pending mods after the device has had time to process and send back
             # updated state
@@ -445,7 +474,7 @@ class Device(DeviceBase, ProtobufProps):
 
     @controls.power(
         discharging_power_limit,
-        max=dynamic(max_ac_out_power),
+        max=dynamic(ac_out_power_max),
         availability=dynamic(discharging_task_available),
     )
     async def set_discharging_power_limit(self, limit: float):
